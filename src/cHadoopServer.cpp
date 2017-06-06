@@ -41,6 +41,7 @@ void reduceFun(std::vector<ch::Tuple<ch::String, ch::Integer> *> & sorted, ch::S
                 res = (*e);
             }
         }
+        delete e;
     }
     if (started) {
         D("Emit: " << res.toString() << std::endl);

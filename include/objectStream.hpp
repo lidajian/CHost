@@ -125,7 +125,7 @@ namespace ch {
             }
             void getReceived (std::vector<T *> & res) {
                 res.insert(std::end(res), std::begin(_received), std::end(_received));
-                clear();
+                _received.clear();
             }
     };
 }
