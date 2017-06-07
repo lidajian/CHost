@@ -55,6 +55,10 @@ namespace ch {
         }
         return buf.st_size;
     }
+    bool fileExist(const char * path) {
+        struct stat buf;
+        return (stat(path, &buf) >= 0);
+    }
     bool prepareServer(int & serverfd, unsigned short port){
         sockaddr_in addr;
 

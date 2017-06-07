@@ -8,7 +8,7 @@
 const char C_SERVER = CALL_SERVER;
 
 inline void printHelp() {
-    std::cout << "Usage: cHadoopStarter -c [configuration file] -i [input data] -o [output path]\n";
+    std::cout << "Usage: cHadoopStarter -c [configuration file] -i [input data] -o [output file]\n";
 }
 
 bool createTargetConfigurationFile (std::string & confFilePath, std::string & targetConfFilePath) {
@@ -75,6 +75,24 @@ int main(int argc, char ** argv) {
 
     if (!getConfFilePath(argc, argv, confFilePath, dataFilePath, outputFilePath)) {
         printHelp();
+        return 0;
+    }
+
+
+    // get full data file path if necessary
+    char * current_dir = getcwd(NULL, 0);
+    std::string current_dir_str(current_dir);
+    current_dir_str.push_back('/');
+    free(current_dir);
+    if (dataFilePath[0] != '/' && dataFilePath[0] != '~') {
+        dataFilePath = current_dir_str + dataFilePath;
+    }
+    if (outputFilePath[0] != '/' && outputFilePath[0] != '~') {
+        outputFilePath = current_dir_str + outputFilePath;
+    }
+
+    if (ch::fileExist(outputFilePath.c_str())) {
+        L("The output file exists.\n");
         return 0;
     }
 
