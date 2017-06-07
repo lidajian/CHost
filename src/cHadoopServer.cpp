@@ -73,9 +73,9 @@ bool serveServer(int sockfd) {
 
     ch::SourceManager source(dataFilePath.c_str(), jobFilePath);
 
-    D("source opened.\n");
-
     if (source.isValid()) {
+
+        D("source opened.\n");
         source.startFileDistributionThreads(sockfd, ips, SERVER_PORT);
 
         // do job

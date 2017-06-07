@@ -206,8 +206,7 @@ namespace ch {
                     L("Broken pipe.\n");
                     return false;
                 } else {
-                    buffer[rv] = '\0';
-                    str += buffer;
+                    str.append(buffer, rv);
                     receivedSize += rv;
                 }
             } while (receivedSize < strSize);
@@ -293,6 +292,41 @@ namespace ch {
         }
 
         return true;
+    }
+
+    bool readFileAsString(const char * file_path, std::string & str) {
+        str.clear();
+        char buffer[BUFFER_SIZE];
+        int fd = open(file_path, O_RDONLY);
+        if (fd > 0) {
+            ssize_t fileSize = getFileSize(fd);
+            ssize_t readSize = 0;
+            ssize_t byteLeft, toRead;
+            if (fileSize > 0) {
+                ssize_t rv;
+                do {
+                    byteLeft = fileSize - readSize;
+                    toRead = MIN_VAL(byteLeft, BUFFER_SIZE);
+                    rv = sread(fd, static_cast<void *>(buffer), toRead);
+                    if (rv < 0) {
+                        L("Broken pipe.\n");
+                        return false;
+                    } else {
+                        str.append(buffer, rv);
+                        readSize += rv;
+                    }
+                } while (readSize < fileSize);
+                close(fd);
+                return true;
+            } else {
+                L("Empty file.\n");
+                close(fd);
+                return false;
+            }
+        } else {
+            L("File not found.\n");
+            return false;
+        }
     }
 
 }

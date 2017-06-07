@@ -100,6 +100,7 @@ namespace ch {
             std::vector<std::thread *> threads;
             BlockedBuffer buffer;
             std::string _jobFilePath;
+            std::string _jobFile;
         public:
             inline bool isValid() {
                 return (fd > 0);
@@ -122,10 +123,13 @@ namespace ch {
                 }
             }
             SourceManager(const char * dataFile, std::string & jobFilePath): isServer(true), _jobFilePath(jobFilePath) {
-                D("Attempt to open data file.\n");
-                fd = open(dataFile, O_RDONLY);
-                buffer.setFd(fd);
-                D("Data file opened.\n");
+                fd = INVALID_SOCKET;
+                if (ch::readFileAsString(jobFilePath.c_str(), _jobFile)) {
+                    D("Attempt to open data file.\n");
+                    fd = open(dataFile, O_RDONLY);
+                    buffer.setFd(fd);
+                    D("Data file opened.\n");
+                }
             }
             static void distributionThread(distribution_thread_in_t * args_in) {
                 int csockfd;
@@ -150,7 +154,7 @@ namespace ch {
                 sendString(csockfd, rearrangedConfiguration);
 
                 // send job file
-                sendFile(csockfd, source->_jobFilePath.c_str());
+                sendString(csockfd, source->_jobFile);
 
                 // provide poll service
                 ssize_t rv;
