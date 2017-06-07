@@ -174,14 +174,12 @@ int main(int argc, char ** argv) {
 
     // run server
 
-    int serverfd;
+    int serverfd = INVALID_SOCKET;
 
     sockaddr_in remote;
     socklen_t s_size;
 
-    ch::prepareServer(serverfd, SERVER_PORT);
-
-    if (serverfd > 0) {
+    if (ch::prepareServer(serverfd, SERVER_PORT)) {
         while (1) {
             D("Accepting request.\n");
             int * sockfd = new int();
