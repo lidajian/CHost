@@ -40,5 +40,6 @@
 #define MIN_VAL(a, b) ((a < b) ? a : b)
 
 #define IPCONFIG_FILE "/ipconfig"
+#define JOB_FILE "/job"
 
 #endif

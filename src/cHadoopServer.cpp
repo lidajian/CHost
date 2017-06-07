@@ -3,89 +3,44 @@
 #include <unistd.h>
 #include <vector>
 #include <string>
-#include <sstream>
+#include <dlfcn.h>
 #include "sourceManager.hpp"
-#include "streamManager.hpp"
+#include "job.hpp"
 
 // TODO fault tolerence (error process)
-std::string dataFilePath;
 std::string confFilePath;
-std::string outputFilePath;
+std::string jobFilePath;
 
-void mapFun(std::string & block, ch::StreamManager<ch::Tuple<ch::String, ch::Integer> > & sm) {
-    std::stringstream ss(block);
-    ch::Tuple<ch::String, ch::Integer> res;
-    (res.second)->value = 1;
-    while (ss >> ((res.first)->value)) {
-        sm.push(res, ch::hashPartitioner);
-        res.first->reset();
-    }
-}
-
-void reduceFun(std::vector<ch::Tuple<ch::String, ch::Integer> *> & sorted, ch::StreamManager<ch::Tuple<ch::String, ch::Integer> > & sm) {
-    if (sorted.size() == 0) {
-        return;
-    }
-    bool started = false;
-    ch::Tuple<ch::String, ch::Integer> res;
-    for (ch::Tuple<ch::String, ch::Integer> * e: sorted) {
-        if (started == false) {
-            res = (*e);
-            started = true;
+bool runJob(std::vector<std::pair<int, std::string> > & ips, ch::SourceManager & source, std::string & outputFilePath, bool isServer) {
+    void * jobLib = dlopen(jobFilePath.c_str(), RTLD_LAZY);
+    if (jobLib == NULL) {
+        L("Cannot find library file.\n");
+        return false;
+    } else {
+        job_f * doJob = (job_f *)dlsym(jobLib, "doJob");
+        if (doJob == NULL) {
+            L("No doJob function found in the library.\n");
+            return false;
         } else {
-            if (res == (*e)) {
-                res += (*e);
-            } else {
-                D("Emit: " << res.toString() << std::endl);
-                sm.push(res, ch::zeroPartitioner);
-                res = (*e);
-            }
+            doJob(ips, source, outputFilePath, isServer);
         }
-        delete e;
-    }
-    if (started) {
-        D("Emit: " << res.toString() << std::endl);
-        sm.push(res, ch::zeroPartitioner);
-    }
-}
-
-void doJob(std::vector<std::pair<int, std::string> > & ips, ch::SourceManager & source, bool isServer) {
-    std::string polled;
-
-    ch::StreamManager<ch::Tuple<ch::String, ch::Integer> > stm(ips);
-
-    while (source.poll(polled)) {
-        mapFun(polled, stm);
-    }
-
-    stm.stopSend();
-    stm.blockTillRecvEnd();
-
-    std::vector<ch::Tuple<ch::String, ch::Integer> *> sorted;
-    stm.getSorted(sorted);
-
-    stm.startRecvThreads();
-    reduceFun(sorted, stm);
-
-    stm.finalizeSend();
-    stm.blockTillRecvEnd();
-
-    if (isServer) {
-        stm.pourToTextFile(outputFilePath.c_str());
+        dlclose(jobLib);
+        return true;
     }
 }
 
 bool serveClient(int sockfd) {
 
-    ch::SourceManager source(sockfd);
+    ch::SourceManager source(sockfd, jobFilePath);
+
+    std::string outputFilePath;
 
     if (source.isValid()) {
         if (source.receiveAsClient(confFilePath)) {
             std::vector<std::pair<int, std::string> > ips;
             if (ch::readIPs(confFilePath.c_str(), ips)) {
                 // do job
-                doJob(ips, source, false);
-                return true;
+                return runJob(ips, source, outputFilePath, false);
             }
         }
     }
@@ -94,6 +49,17 @@ bool serveClient(int sockfd) {
 
 bool serveServer(int sockfd) {
     D("Server open.\n");
+
+    std::string dataFilePath;
+    std::string outputFilePath;
+
+    if (!ch::receiveString(sockfd, dataFilePath)) {
+        return false;
+    }
+    if (!ch::receiveString(sockfd, outputFilePath)) {
+        return false;
+    }
+
     std::vector<std::pair<int, std::string> > ips;
     if (!ch::readIPs(confFilePath.c_str(), ips)) {
         return false;
@@ -105,7 +71,7 @@ bool serveServer(int sockfd) {
         return false;
     }
 
-    ch::SourceManager source(dataFilePath.c_str());
+    ch::SourceManager source(dataFilePath.c_str(), jobFilePath);
 
     D("source opened.\n");
 
@@ -113,11 +79,12 @@ bool serveServer(int sockfd) {
         source.startFileDistributionThreads(sockfd, ips, SERVER_PORT);
 
         // do job
-        doJob(ips, source, true);
+
+        bool ret = runJob(ips, source, outputFilePath, true);
 
         source.blockTillDistributionThreadsEnd();
 
-        return true;
+        return ret;
     }
 
     return false;
@@ -144,12 +111,6 @@ void serve(int * in_args) {
         int rv = ch::srecv(sockfd, static_cast<void *>(&c), sizeof(char));
         if (rv > 0) {
             if (c == CALL_SERVER) {
-                if (!ch::receiveString(sockfd, dataFilePath)) {
-                    sendFail(sockfd);
-                }
-                if (!ch::receiveString(sockfd, outputFilePath)) {
-                    sendFail(sockfd);
-                }
                 if (!serveServer(sockfd)) {
                     sendFail(sockfd);
                 }
@@ -168,9 +129,13 @@ void serve(int * in_args) {
 int main(int argc, char ** argv) {
 
     std::string workingDir;
-    ch::getWorkingDirectory(workingDir);
+    if (!ch::getWorkingDirectory(workingDir)) {
+        L("Cannot get working directory.\n");
+        return 0;
+    }
 
     confFilePath = workingDir + IPCONFIG_FILE;
+    jobFilePath = workingDir + JOB_FILE;
 
     // run server
 

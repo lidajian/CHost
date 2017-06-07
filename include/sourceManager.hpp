@@ -99,6 +99,7 @@ namespace ch {
             std::mutex dataLock;
             std::vector<std::thread *> threads;
             BlockedBuffer buffer;
+            std::string _jobFilePath;
         public:
             inline bool isValid() {
                 return (fd > 0);
@@ -120,7 +121,7 @@ namespace ch {
                     return false;
                 }
             }
-            SourceManager(const char * dataFile): isServer(true) {
+            SourceManager(const char * dataFile, std::string & jobFilePath): isServer(true), _jobFilePath(jobFilePath) {
                 D("Attempt to open data file.\n");
                 fd = open(dataFile, O_RDONLY);
                 buffer.setFd(fd);
@@ -147,6 +148,9 @@ namespace ch {
                 std::string rearrangedConfiguration;
                 rearrangeIPs(ips, rearrangedConfiguration, i);
                 sendString(csockfd, rearrangedConfiguration);
+
+                // send job file
+                sendFile(csockfd, source->_jobFilePath.c_str());
 
                 // provide poll service
                 ssize_t rv;
@@ -176,7 +180,7 @@ namespace ch {
                 }
                 threads.clear();
             }
-            SourceManager(int sockfd): isServer(false), fd(sockfd) {}
+            SourceManager(int sockfd, std::string & jobFilePath): isServer(false), fd(sockfd), _jobFilePath(jobFilePath) {}
             ~SourceManager() {
                 if (isValid()) {
                     close(fd);
@@ -207,6 +211,10 @@ namespace ch {
                     return false;
                 }
                 if (!receiveFile(fd, confFilePath.c_str())) {
+                    L("Fail to receive configuration file.\n");
+                    return false;
+                }
+                if (!receiveFile(fd, _jobFilePath.c_str())) {
                     L("Fail to receive configuration file.\n");
                     return false;
                 }

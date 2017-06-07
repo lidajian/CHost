@@ -131,14 +131,14 @@ namespace ch {
         return rv;
     }
 
-    void getWorkingDirectory(std::string & workingDir) {
+    bool getWorkingDirectory(std::string & workingDir) {
 
         // create the folder
         const char * homedir = getenv("HOME");
 
         if (homedir == NULL) {
             L("$HOME environment variable not set.\n");
-            std::terminate();
+            return false;
         }
         workingDir = homedir;
         workingDir += "/.cHadoop";
@@ -146,6 +146,7 @@ namespace ch {
         cmdString += workingDir;
 
         system(cmdString.c_str());
+        return true;
 
     }
 

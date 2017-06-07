@@ -1,4 +1,5 @@
 #include <fcntl.h>
+#include <stdlib.h>
 #include <string>
 #include <iostream>
 #include <fstream>
@@ -8,7 +9,7 @@
 const char C_SERVER = CALL_SERVER;
 
 inline void printHelp() {
-    std::cout << "Usage: cHadoopStarter -c [configuration file] -i [input data] -o [output file]\n";
+    std::cout << "Usage: cHadoopStarter\n -c [configuration file]\n -i [input data]\n -o [output file]\n -j [job file]\n";
 }
 
 bool createTargetConfigurationFile (std::string & confFilePath, std::string & targetConfFilePath) {
@@ -31,12 +32,13 @@ bool createTargetConfigurationFile (std::string & confFilePath, std::string & ta
     return true;
 }
 
-bool getConfFilePath(int argc, char ** argv, std::string & confFilePath, std::string & dataFilePath, std::string & outputFilePath) {
+bool getConfFilePath(int argc, char ** argv, std::string & confFilePath, std::string & dataFilePath, std::string & outputFilePath, std::string & jobFilePath) {
     char c;
     bool hasC = false;
     bool hasI = false;
     bool hasO = false;
-    while ((c = getopt(argc, argv, "c:i:o:")) != -1) {
+    bool hasJ = false;
+    while ((c = getopt(argc, argv, "c:i:o:j:")) != -1) {
         if (c == 'c') {
             hasC = true;
             confFilePath = optarg;
@@ -46,9 +48,12 @@ bool getConfFilePath(int argc, char ** argv, std::string & confFilePath, std::st
         } else if (c == 'o') {
             hasO = true;
             outputFilePath = optarg;
+        } else if (c == 'j') {
+            hasJ = true;
+            jobFilePath = optarg;
         }
     }
-    return (hasC && hasI && hasO);
+    return (hasC && hasI && hasO && hasJ);
 }
 
 void getResult(int sockfd) {
@@ -71,9 +76,12 @@ int main(int argc, char ** argv) {
     std::string confFilePath;
     std::string dataFilePath;
     std::string outputFilePath;
+    std::string jobFilePath;
     std::string targetConfFilePath;
+    std::string targetJobFilePath;
+    std::string cpCmd("cp ");
 
-    if (!getConfFilePath(argc, argv, confFilePath, dataFilePath, outputFilePath)) {
+    if (!getConfFilePath(argc, argv, confFilePath, dataFilePath, outputFilePath, jobFilePath)) {
         printHelp();
         return 0;
     }
@@ -105,11 +113,18 @@ int main(int argc, char ** argv) {
     ch::getWorkingDirectory(workingDir);
 
     targetConfFilePath = workingDir + IPCONFIG_FILE;
+    targetJobFilePath = workingDir + JOB_FILE;
 
     if (!createTargetConfigurationFile(confFilePath, targetConfFilePath)) {
         L("Cannot create configuration file\n");
         return 0;
     }
+
+    cpCmd += jobFilePath;
+    cpCmd.push_back(' ');
+    cpCmd += targetJobFilePath;
+
+    system(cpCmd.c_str());
 
     ch::ssend(sockfd, static_cast<const void *>(&C_SERVER), sizeof(char));
 
