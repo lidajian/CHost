@@ -181,12 +181,16 @@ int main(int argc, char ** argv) {
 
     ch::prepareServer(serverfd, SERVER_PORT);
 
-    while (1) {
-        D("Accepting request.\n");
-        int * sockfd = new int();
-        *sockfd = accept(serverfd, reinterpret_cast<struct sockaddr *>(&remote), &s_size);
-        std::thread serve_thread(serve, sockfd);
-        serve_thread.join(); // accept one request each time
+    if (serverfd > 0) {
+        while (1) {
+            D("Accepting request.\n");
+            int * sockfd = new int();
+            *sockfd = accept(serverfd, reinterpret_cast<struct sockaddr *>(&remote), &s_size);
+            std::thread serve_thread(serve, sockfd);
+            serve_thread.join(); // accept one request each time
+        }
+    } else {
+        L("Port occupied.\n");
     }
 
     return 0;

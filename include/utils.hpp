@@ -147,7 +147,7 @@ namespace ch {
 
     bool receiveFile(int sockfd, const char * file_path) {
         char buffer[BUFFER_SIZE];
-        int file = open(file_path, O_WRONLY | O_CREAT);
+        int file = open(file_path, O_WRONLY | O_CREAT, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH);
         if (file < 0) {
             L("Cannot open file to write.\n");
             return false;
