@@ -1,6 +1,6 @@
 #include <string>
 #include <sstream>
-#include "StreamManager.hpp"
+#include "streamManager.hpp"
 #include "sourceManager.hpp"
 
 void mapFun(std::string & block, ch::StreamManager<ch::Tuple<ch::String, ch::Integer> > & sm) {
