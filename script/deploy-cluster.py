@@ -13,7 +13,6 @@ def install_packages(ip, pem):
     done = False
     ssh = pexpect.spawn('ssh -i ' + pem + ' ec2-user@' + ip)
     try:
-        print 'Connecting to ' + ip
         i = ssh.expect(['continue connecting (yes/no)?', 'Last login'], timeout = 5)
         if i == 0:
             ssh.sendline('yes')
@@ -46,7 +45,6 @@ def deploy_on(ip, pem, git_user, git_password):
     done = False
     ssh = pexpect.spawn('ssh -i ' + pem + ' ec2-user@' + ip)
     try:
-        print 'Connecting to ' + ip
         i = ssh.expect(['continue connecting (yes/no)?', 'Last login'], timeout = 5)
         if i == 0:
             ssh.sendline('yes')
@@ -72,7 +70,6 @@ def deploy_on(ip, pem, git_user, git_password):
 
         ssh.sendline('exit')
         r = ssh.read()
-        print 'Done on ' + ip
         done = True
     except pexpect.EOF:
         print 'Fail on ' + ip + ': unexpected EOF'
@@ -101,6 +98,8 @@ if __name__ == '__main__':
                 if tries == MAX_TRY:
                     print 'Fail to finish on ' + ip
                     failedIP.append(ip)
+                else:
+                    print 'Done on ' + ip
 
         if len(failedIP) == 0:
             print 'Deployed on all machines'
