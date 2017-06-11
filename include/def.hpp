@@ -42,4 +42,9 @@
 #define IPCONFIG_FILE "/ipconfig"
 #define JOB_FILE "/job"
 
+#define RANDOM_FILE_NAME_LENGTH 8
+#define DEFAULT_MAX_DATA_SIZE 1000000
+
+#define S_CREAT_DEFAULT (S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH)
+
 #endif

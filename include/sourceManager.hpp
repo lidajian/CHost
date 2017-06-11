@@ -28,11 +28,11 @@ namespace ch {
 
     struct distribution_thread_in_t {
         int _ind;
-        std::vector<std::pair<int, std::string> > * _ips;
+        std::vector<std::pair<int, std::string> > & _ips;
         unsigned short _port;
         SourceManager * _source;
 
-        explicit distribution_thread_in_t(int ind, std::vector<std::pair<int, std::string> > * ips, unsigned short port, SourceManager * source): _ind(ind), _ips(ips), _port(port), _source(source) {}
+        explicit distribution_thread_in_t(int ind, std::vector<std::pair<int, std::string> > & ips, unsigned short port, SourceManager * source): _ind(ind), _ips(ips), _port(port), _source(source) {}
     };
 
     class BlockedBuffer {
@@ -133,7 +133,7 @@ namespace ch {
             }
             static void distributionThread(distribution_thread_in_t * args_in) {
                 int csockfd;
-                std::vector<std::pair<int, std::string> > & ips = *(args_in->_ips);
+                std::vector<std::pair<int, std::string> > & ips = args_in->_ips;
                 unsigned short port = args_in->_port;
                 int i = args_in->_ind;
                 SourceManager * source = args_in->_source;
@@ -200,7 +200,7 @@ namespace ch {
                 }
                 int numIP = ips.size();
                 for (int i = 1; i < numIP; ++i) {
-                    distribution_thread_in_t * distribution_thread_in = new distribution_thread_in_t(i, &ips, port, this);
+                    distribution_thread_in_t * distribution_thread_in = new distribution_thread_in_t(i, ips, port, this);
                     std::thread * t = new std::thread(distributionThread, distribution_thread_in);
                     threads.push_back(t);
                 }

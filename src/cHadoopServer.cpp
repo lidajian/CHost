@@ -10,6 +10,7 @@
 // TODO fault tolerence (error process)
 std::string confFilePath;
 std::string jobFilePath;
+std::string workingDir;
 
 bool runJob(std::vector<std::pair<int, std::string> > & ips, ch::SourceManager & source, std::string & outputFilePath, bool isServer) {
     void * jobLib = dlopen(jobFilePath.c_str(), RTLD_LAZY);
@@ -17,12 +18,13 @@ bool runJob(std::vector<std::pair<int, std::string> > & ips, ch::SourceManager &
         L("Cannot find library file.\n");
         return false;
     } else {
-        job_f * doJob = (job_f *)dlsym(jobLib, "doJob");
+        ch::job_f * doJob = (ch::job_f *)dlsym(jobLib, "doJob");
         if (doJob == NULL) {
             L("No doJob function found in the library.\n");
             return false;
         } else {
-            doJob(ips, source, outputFilePath, isServer);
+            ch::context_t context(ips, source, outputFilePath, workingDir, isServer);
+            doJob(context);
         }
         dlclose(jobLib);
         return true;
@@ -128,7 +130,6 @@ void serve(int * in_args) {
 
 int main(int argc, char ** argv) {
 
-    std::string workingDir;
     if (!ch::getWorkingDirectory(workingDir)) {
         L("Cannot get working directory.\n");
         return 0;

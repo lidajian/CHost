@@ -17,115 +17,66 @@ namespace ch {
         protected:
             int _sockfd;
         public:
-            ObjectStream(): _sockfd(INVALID_SOCKET){}
+            ObjectStream(): _sockfd(INVALID_SOCKET) {}
+            ObjectStream(int sockfd): _sockfd(sockfd) {}
             virtual ~ObjectStream() {}
+            inline bool isValid(void) {
+                return _sockfd != INVALID_SOCKET;
+            }
             virtual void close(void) = 0;
     };
 
     template <class T>
-    class ObjectInputStream;
-
-    template <class T>
     class ObjectOutputStream: public ObjectStream {
-        protected:
-            ObjectInputStream<T> * _localInputStream;
         public:
-            ObjectOutputStream(){}
-            ObjectOutputStream(ObjectInputStream<T> * localInputStream): _localInputStream(localInputStream) {}
+            ObjectOutputStream() {}
             ~ObjectOutputStream() {close();}
-            int open(const std::string & ip, unsigned short port) {
+            bool open(const std::string & ip, unsigned short port) {
                 close();
-                return sconnect(_sockfd, ip.c_str(), port);
+                return sconnect(_sockfd, ip.c_str(), port) >= 0;
             }
             void stop() {
-                if (_sockfd != INVALID_SOCKET) {
+                if (isValid()) {
                     const id_t id_invalid = ID_INVALID;
                     ssend(_sockfd, static_cast<const void *>(&id_invalid), sizeof(id_t));
                 }
             }
             void close(void) {
-                _localInputStream = NULL;
-                if (_sockfd != INVALID_SOCKET) {
+                if (isValid()) {
                     const id_t id_invalid = ID_INVALID;
                     ssend(_sockfd, static_cast<const void *>(&id_invalid), sizeof(id_t));
                     ::close(_sockfd);
                     _sockfd = INVALID_SOCKET;
                 }
             }
-            bool push(T & v) {
-                if (_localInputStream != NULL) {
-                    T * nv = new T(v);
-                    _localInputStream->_received.push_back(nv);
-                    D("Store local: " << (v.toString()) << std::endl);
-                    return true;
-                }
-                if (_sockfd == INVALID_SOCKET) {
-                    return false;
-                }
+            bool send(T & v) {
                 D("Sending: " << v.toString() << std::endl);
-                id_t id = v.getId();
-                if (ssend(_sockfd, static_cast<const void *>(&id), sizeof(id_t)) < 0) {
-                    return false;
-                }
-                if (v.send(_sockfd) < 0) {
-                    return false;
-                }
-                return true;
+                return v.send(_sockfd);
             }
     };
 
     template <class T>
     class ObjectInputStream: public ObjectStream {
-        friend class ObjectOutputStream<T>;
-
-        private:
-            std::vector<T *> _received;
         public:
+            ObjectInputStream(int sockfd): ObjectStream(sockfd) {}
             ~ObjectInputStream() {close();}
             void setSocket(int sockfd) {
                 _sockfd = sockfd;
             }
-            void clear() {
-                for (T * v: _received) {
-                    delete v;
-                }
-                _received.clear();
-            }
             void close(void) {
-                if (_sockfd != INVALID_SOCKET) {
+                if (isValid()) {
                     ::close(_sockfd);
                     _sockfd = INVALID_SOCKET;
                 }
-                clear();
             }
-            void startRecv(void) {
-                id_t id = ID_INVALID;
-                while (true) {
-                    if (srecv(_sockfd, static_cast<void *>(&id), sizeof(id_t)) < 0) {
-                        break;
-                    }
-                    if (id == ID_INVALID) {
-                        break;
-                    }
-
-                    T * v = new T();
-                    if (v->recv(_sockfd) == INVALID) {
-                        break;
-                    }
-                    _received.push_back(v);
-                    D("Received: " << (v->toString()) << std::endl);
-                }
-            }
-            void pourToTextFile(std::ofstream & os) {
-                for (T * v: _received) {
-                    os << v->toString() << std::endl;
+            T * recv(void) {
+                T * v = new T();
+                if (!(v->recv(_sockfd))) {
                     delete v;
+                    return NULL;
                 }
-                _received.clear();
-            }
-            void getReceived (std::vector<T *> & res) {
-                res.insert(std::end(res), std::begin(_received), std::end(_received));
-                _received.clear();
+                D("Received: " << (v->toString()) << std::endl);
+                return v;
             }
     };
 }

@@ -19,15 +19,17 @@ namespace ch {
             }
             virtual int hashCode(void) = 0;
             virtual std::string toString() = 0;
-            virtual ssize_t send(int fd) = 0;
-            virtual ssize_t recv(int fd) = 0;
+            virtual bool send(int fd) = 0;
+            virtual bool recv(int fd) = 0;
+            virtual bool read(int fd) = 0;
+            virtual bool write(int fd) = 0;
     };
 
     class Integer: public Base {
         public:
             int value;
             Integer(int v = 0): value(v) {}
-            Integer(Integer & i) {value = i.value;}
+            Integer(const Integer & i) {value = i.value;}
             ~Integer() {}
             int hashCode(void) {
                 return value;
@@ -38,11 +40,17 @@ namespace ch {
             inline static id_t getId(void) {
                 return ID_INTEGER;
             }
-            ssize_t send(int fd) {
-                return ssend(fd, static_cast<const void *>(&value), sizeof(int));
+            bool send(int fd) {
+                return ssend(fd, static_cast<const void *>(&value), sizeof(int)) == sizeof(int);
             }
-            ssize_t recv(int fd) {
-                return srecv(fd, static_cast<void *>(&value), sizeof(int));
+            bool recv(int fd) {
+                return srecv(fd, static_cast<void *>(&value), sizeof(int)) == sizeof(int);
+            }
+            bool read(int fd) {
+                return sread(fd, static_cast<void *>(&value), sizeof(int)) == sizeof(int);
+            }
+            bool write(int fd) {
+                return swrite(fd, static_cast<const void *>(&value), sizeof(int)) == sizeof(int);
             }
             bool operator == (const Integer & b) const {
                 return (value == b.value);
@@ -76,7 +84,7 @@ namespace ch {
         public:
             long value;
             Long(long v = 0): value(v) {}
-            Long(Long & i) {value = i.value;}
+            Long(const Long & i) {value = i.value;}
             ~Long() {}
             int hashCode(void) {
                 return (int)value;
@@ -87,11 +95,17 @@ namespace ch {
             inline static id_t getId(void) {
                 return ID_LONG;
             }
-            ssize_t send(int fd) {
-                return ssend(fd, static_cast<const void *>(&value), sizeof(long));
+            bool send(int fd) {
+                return ssend(fd, static_cast<const void *>(&value), sizeof(long)) == sizeof(long);
             }
-            ssize_t recv(int fd) {
-                return srecv(fd, static_cast<void *>(&value), sizeof(long));
+            bool recv(int fd) {
+                return srecv(fd, static_cast<void *>(&value), sizeof(long)) == sizeof(long);
+            }
+            bool read(int fd) {
+                return sread(fd, static_cast<void *>(&value), sizeof(long)) == sizeof(long);
+            }
+            bool write(int fd) {
+                return swrite(fd, static_cast<const void *>(&value), sizeof(long)) == sizeof(long);
             }
             bool operator == (const Long & b) const {
                 return (value == b.value);
@@ -127,7 +141,7 @@ namespace ch {
         public:
             std::string value;
             String(): hash(INVALID) {}
-            String(String & str) {
+            String(const String & str) {
                 hash = INVALID;
                 value = str.value;
             }
@@ -151,18 +165,17 @@ namespace ch {
             inline static id_t getId(void) {
                 return ID_STRING;
             }
-            ssize_t send(int fd) {
-                size_t len = value.size();
-                ssize_t rv = ssend(fd, static_cast<const void *>(&len), sizeof(size_t));
-                rv += ssend(fd, static_cast<const void *>(value.data()), value.size());
-                return rv;
+            bool send(int fd) {
+                return sendString(fd, value);
             }
-            ssize_t recv(int fd) {
-                if (receiveString(fd, value)) {
-                    return 1;
-                } else {
-                    return INVALID;
-                }
+            bool recv(int fd) {
+                return receiveString(fd, value);
+            }
+            bool read(int fd) {
+                return readString(fd, value);
+            }
+            bool write(int fd) {
+                return writeString(fd, value);
             }
             void reset(void) {
                 hash = INVALID;
@@ -199,78 +212,68 @@ namespace ch {
     template <class T1, class T2>
     class Tuple: public Base {
         public:
-            T1 * first;
-            T2 * second;
-            Tuple() {
-                first = new T1();
-                second = new T2();
-            }
-            Tuple(T1 & v1, T2 & v2) {
-                first = new T1(v1);
-                second = new T2(v2);
-            }
-            Tuple(Tuple & t) {
-                first = new T1(*(t.first));
-                second = new T2(*(t.second));
-            }
-            ~Tuple() {
-                delete first;
-                delete second;
-            }
+            T1 first;
+            T2 second;
+            Tuple() {}
+            Tuple(T1 & v1, T2 & v2): first(v1), second(v2) {}
+            Tuple(const Tuple<T1, T2> & t): first(t.first), second(t.second) {}
+            ~Tuple() {}
             int hashCode(void) {
-                return first->hashCode();
+                return first.hashCode();
             }
             std::string toString() {
-                return "(" + first->toString() + ", " + second->toString() + ")";
+                return "(" + first.toString() + ", " + second.toString() + ")";
             }
             inline static id_t getId(void) {
                 return (T1::getId() << 4) | T2::getId();
             }
-            ssize_t send(int fd) {
+            bool send(int fd) {
                 id_t id = getId();
-                return ssend(fd, static_cast<const void *>(&id), sizeof(id_t)) + first->send(fd) + second->send(fd);
+                if (ssend(fd, static_cast<const void *>(&id), sizeof(id_t)) == sizeof(id_t)) {
+                    return first.send(fd) && second.send(fd);
+                }
+                return false;
             }
-            ssize_t recv(int fd) {
+            bool recv(int fd) {
                 id_t id = ID_INVALID;
-                srecv(fd, static_cast<void *>(&id), sizeof(id_t));
-                if (id == ID_INVALID) {
-                    return INVALID;
+                if (srecv(fd, static_cast<void *>(&id), sizeof(id_t)) == sizeof(id_t)) {
+                    if (id == getId()) {
+                        return first.recv(fd) && second.recv(fd);
+                    }
                 }
-                ssize_t rv1 = first->recv(fd);
-                if (rv1 < 0) {
-                    return INVALID;
-                }
-                ssize_t rv2 = second->recv(fd);
-                if (rv2 < 0) {
-                    return INVALID;
-                }
-                return rv1 + rv2;
+                return false;
+            }
+            bool read(int fd) {
+                return first.read(fd) && second.read(fd);
+            }
+            bool write(int fd) {
+                return first.write(fd) && second.write(fd);
             }
             bool operator == (const Tuple & b) const {
-                return ((*first) == (*(b.first)));
+                return (first == b.first);
             }
             bool operator != (const Tuple & b) const {
-                return ((*first) != (*(b.first)));
+                return (first != b.first);
             }
             bool operator < (const Tuple & b) const {
-                return ((*first) < (*(b.first)));
+                return (first < b.first);
             }
             bool operator > (const Tuple & b) const {
-                return ((*first) > (*(b.first)));
+                return (first > b.first);
             }
             bool operator <= (const Tuple & b) const {
-                return ((*first) <= (*(b.first)));
+                return (first <= b.first);
             }
             bool operator >= (const Tuple & b) const {
-                return ((*first) >= (*(b.first)));
+                return (first >= b.first);
             }
             Tuple & operator = (const Tuple & t) {
-                (*first) = (*(t.first));
-                (*second) = (*(t.second));
+                first = t.first;
+                second = t.second;
                 return (*this);
             }
             Tuple & operator += (const Tuple & t) {
-                (*second) += (*(t.second));
+                second += t.second;
                 return (*this);
             }
 
