@@ -127,6 +127,15 @@ namespace ch {
         return true;
     }
 
+    void rearrangeIPs(std::vector<std::pair<int, std::string> > & ips, std::string & file, int indexToHead) {
+        file = std::to_string(ips[indexToHead].first) + " " + ips[indexToHead].second + "\n";
+        for (int i = 0, l = ips.size(); i < l; ++i) {
+            if (i != indexToHead) {
+                file += std::to_string(ips[i].first) + " " + ips[i].second + "\n";
+            }
+        }
+    }
+
     bool getWorkingDirectory(std::string & workingDir) {
 
         // create the folder
@@ -151,15 +160,10 @@ namespace ch {
         char buffer[BUFFER_SIZE];
         int file = open(file_path, O_RDONLY);
         if (file < 0) {
-            L("Cannot open file to write.\n");
+            D("Cannot open file to write.\n");
             return false;
         }
         ssize_t fileSize = getFileSize(file);
-
-        if (fileSize < 0) {
-            L("Empty file.\n");
-            close(file);
-        }
 
         if (ssend(sockfd, static_cast<void *>(&fileSize), sizeof(ssize_t)) == sizeof(ssize_t)) {
             ssize_t sentSize = 0;
@@ -170,12 +174,12 @@ namespace ch {
                 if (toSend > 0) {
                     ssize_t rv = sread(file, static_cast<void *>(buffer), toSend);
                     if (rv < 0) {
-                        L("Cannot read file.\n");
+                        D("Cannot read file.\n");
                         return false;
                     } else {
                         rv = ssend(sockfd, static_cast<const void *>(buffer), rv);
                         if (rv < 0) {
-                            L("Broken pipe.\n");
+                            D("Broken pipe.\n");
                             return false;
                         }
                         sentSize += rv;
@@ -183,7 +187,7 @@ namespace ch {
                 }
             } while (sentSize < fileSize);
         } else {
-            L("Cannot send file size.\n");
+            D("Cannot send file size.\n");
             close(file);
             return false;
         }
@@ -195,7 +199,7 @@ namespace ch {
         char buffer[BUFFER_SIZE];
         int file = open(file_path, O_WRONLY | O_CREAT, S_CREAT_DEFAULT);
         if (file < 0) {
-            L("Cannot open file to write.\n");
+            D("Cannot open file to write.\n");
             return false;
         }
         ssize_t fileSize;
@@ -208,19 +212,19 @@ namespace ch {
                 toReceive = MIN_VAL(byteLeft, BUFFER_SIZE);
                 rv = srecv(sockfd, static_cast<void *>(buffer), toReceive);
                 if (rv < 0) {
-                    L("Broken pipe.\n");
+                    D("Broken pipe.\n");
                     return false;
                 } else {
                     rv = swrite(file, static_cast<const void *>(buffer), rv);
                     if (rv < 0) {
-                        L("Cannot write file.\n");
+                        D("Cannot write file.\n");
                         return false;
                     }
                     receivedSize += rv;
                 }
             } while (receivedSize < fileSize);
         } else {
-            L("Cannot receive file size or file size is 0.\n");
+            D("Cannot receive file size or file size is 0.\n");
             close(file);
             return false;
         }
@@ -241,7 +245,7 @@ namespace ch {
                 if (toSend > 0) {
                     ssize_t rv = ssend(sockfd, static_cast<const void *>(strStart + sentSize), toSend);
                     if (rv < 0) {
-                        L("Broken pipe.\n");
+                        D("Broken pipe.\n");
                         return false;
                     }
                     sentSize += toSend;
@@ -249,7 +253,7 @@ namespace ch {
             } while (sentSize < strSize);
             return true;
         } else {
-            L("Cannot send string size.\n");
+            D("Cannot send string size.\n");
         }
 
         return false;
@@ -268,7 +272,7 @@ namespace ch {
                 toReceive = MIN_VAL(byteLeft, BUFFER_SIZE);
                 rv = srecv(sockfd, static_cast<void *>(buffer), toReceive);
                 if (rv < 0) {
-                    L("Broken pipe.\n");
+                    D("Broken pipe.\n");
                     return false;
                 } else {
                     str.append(buffer, rv);
@@ -276,7 +280,7 @@ namespace ch {
                 }
             } while (receivedSize < strSize);
         } else {
-            L("Cannot receive string size.\n");
+            D("Cannot receive string size.\n");
             return false;
         }
         return true;
@@ -295,7 +299,7 @@ namespace ch {
                 if (toWrite > 0) {
                     ssize_t rv = swrite(fd, static_cast<const void *>(strStart + writtenSize), toWrite);
                     if (rv < 0) {
-                        L("Broken pipe.\n");
+                        D("Broken pipe.\n");
                         return false;
                     }
                     writtenSize += toWrite;
@@ -303,7 +307,7 @@ namespace ch {
             } while (writtenSize < strSize);
             return true;
         } else {
-            L("Cannot write string size.\n");
+            D("Cannot write string size.\n");
         }
 
         return false;
@@ -322,7 +326,7 @@ namespace ch {
                 toRead = MIN_VAL(byteLeft, BUFFER_SIZE);
                 rv = sread(fd, static_cast<void *>(buffer), toRead);
                 if (rv < 0) {
-                    L("Broken pipe.\n");
+                    D("Broken pipe.\n");
                     return false;
                 } else {
                     str.append(buffer, rv);
@@ -330,7 +334,7 @@ namespace ch {
                 }
             } while (readSize < strSize);
         } else {
-            L("Cannot read string size.\n");
+            D("Cannot read string size.\n");
             return false;
         }
         return true;
@@ -351,7 +355,7 @@ namespace ch {
                     toRead = MIN_VAL(byteLeft, BUFFER_SIZE);
                     rv = sread(fd, static_cast<void *>(buffer), toRead);
                     if (rv < 0) {
-                        L("Broken pipe.\n");
+                        D("Broken pipe.\n");
                         return false;
                     } else {
                         str.append(buffer, rv);
@@ -361,12 +365,12 @@ namespace ch {
                 close(fd);
                 return true;
             } else {
-                L("Empty file.\n");
+                D("Empty file.\n");
                 close(fd);
                 return false;
             }
         } else {
-            L("File not found.\n");
+            D("File not found.\n");
             return false;
         }
     }

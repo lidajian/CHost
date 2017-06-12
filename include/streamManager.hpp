@@ -13,6 +13,7 @@
 #include <algorithm>
 #include "objectStream.hpp"
 #include "dataManager.hpp"
+#include "partitioner.hpp"
 
 namespace ch {
 
@@ -42,84 +43,62 @@ namespace ch {
         explicit receive_thread_in_t(std::vector<ObjectInputStream<T> *> & istreams, int i, DataManager<T> & data): _istreams(istreams), _i(i), _data(data) {}
     };
 
-    class Partitioner {
-        public:
-            virtual int getPartition(int i, int s) = 0;
-    };
-
-    class HashPartitioner: public Partitioner {
-        public:
-            int getPartition(int i, int s) {
-                if (i == INT_MIN) {
-                    return 0;
-                }
-                return ((i < 0) ? -i : i) % s;
-            }
-    } hashPartitioner;
-
-    class ZeroPartitioner: public Partitioner {
-        public:
-            int getPartition(int i, int s) {
-                return 0;
-            }
-    } zeroPartitioner;
-
     template <class T>
-        void serverThread(server_thread_in_t<T> * in_args) {
+    void serverThread(server_thread_in_t<T> * in_args) {
 
-            sockaddr_in remote;
-            socklen_t s_size;
+        sockaddr_in remote;
+        socklen_t s_size;
 
-            int numIP = in_args->_ips.size();
+        int numIP = in_args->_ips.size();
 
-            L("Server accepting client.\n");
+        L("Server accepting client.\n");
 
-            for (int i = 1; i < numIP; ++i) {
-                int sockfd = accept(in_args->_serverfd, reinterpret_cast<struct sockaddr *>(&remote), &s_size);
-                if (sockfd >= 0) {
-                    L("Accepted one.\n");
-                    ObjectInputStream<T> * stm = new ObjectInputStream<T>(sockfd);
-                    in_args->_istreams.push_back(stm);
-                } else {
-                    --i;
-                }
-            }
-
-            delete in_args;
-
-        }
-
-    template <class T>
-        void connectThread(connect_thread_in_t<T> * in_args) {
-            ObjectOutputStream<T> * stm = new ObjectOutputStream<T>();
-            int tries = 0;
-            L("Client connecting to server.\n");
-            while (tries < MAX_CONNECTION_ATTEMPT && !(stm->open(in_args->_ip, STREAMMANAGER_PORT))) {
-                ++tries;
-                std::this_thread::yield();
-            }
-            if (tries == MAX_CONNECTION_ATTEMPT) {
-                L("Client fail to connect to server.\n");
-                delete stm;
+        for (int i = 1; i < numIP; ++i) {
+            int sockfd = accept(in_args->_serverfd, reinterpret_cast<struct sockaddr *>(&remote), &s_size);
+            if (sockfd >= 0) {
+                L("Accepted one.\n");
+                ObjectInputStream<T> * stm = new ObjectInputStream<T>(sockfd);
+                in_args->_istreams.push_back(stm);
             } else {
-                L("Client connected to server.\n");
-                in_args->_stm = stm;
+                --i;
             }
-            delete in_args;
         }
 
+        delete in_args;
+
+    }
+
     template <class T>
-        void recvThread(receive_thread_in_t<T> * in_args) {
-            std::vector<ObjectInputStream<T> *> & istreams = in_args->_istreams;
-            int i = in_args->_i;
-            ObjectInputStream<T> & stm = *(istreams[i]);
-            DataManager<T> & data = in_args->_data;
-            delete in_args;
-            T * got;
-            while ((got = stm.recv())) {
-                data.store(got);
-            }
+    void connectThread(connect_thread_in_t<T> * in_args) {
+        ObjectOutputStream<T> * stm = new ObjectOutputStream<T>();
+        int tries = 0;
+        L("Client connecting to server.\n");
+        while (tries < MAX_CONNECTION_ATTEMPT && !(stm->open(in_args->_ip, STREAMMANAGER_PORT))) {
+            ++tries;
+            std::this_thread::yield();
         }
+        if (tries == MAX_CONNECTION_ATTEMPT) {
+            L("Client fail to connect to server.\n");
+            delete stm;
+        } else {
+            L("Client connected to server.\n");
+            in_args->_stm = stm;
+        }
+        delete in_args;
+    }
+
+    template <class T>
+    void recvThread(receive_thread_in_t<T> * in_args) {
+        std::vector<ObjectInputStream<T> *> & istreams = in_args->_istreams;
+        int i = in_args->_i;
+        ObjectInputStream<T> & stm = *(istreams[i]);
+        DataManager<T> & data = in_args->_data;
+        delete in_args;
+        T * got;
+        while ((got = stm.recv())) {
+            data.store(got);
+        }
+    }
 
     template <class T>
     class StreamManager {

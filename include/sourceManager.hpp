@@ -17,15 +17,6 @@ namespace ch {
 
     class SourceManager;
 
-    void rearrangeIPs(std::vector<std::pair<int, std::string> > & ips, std::string & file, int indexToHead) {
-        file = std::to_string(ips[indexToHead].first) + " " + ips[indexToHead].second + "\n";
-        for (int i = 0, l = ips.size(); i < l; ++i) {
-            if (i != indexToHead) {
-                file += std::to_string(ips[i].first) + " " + ips[i].second + "\n";
-            }
-        }
-    }
-
     struct distribution_thread_in_t {
         int _ind;
         std::vector<std::pair<int, std::string> > & _ips;
@@ -38,56 +29,61 @@ namespace ch {
     class BlockedBuffer {
         protected:
             int _fd;
-            bool valid;
             char buffer[DATA_BLOCK_SIZE + 1];
+            std::mutex readLock;
             size_t bufferedLength; // byte cached in buffer
 
         public:
-            BlockedBuffer(): _fd(INVALID), valid(false), bufferedLength(0) {
+            BlockedBuffer(): _fd(INVALID), bufferedLength(0) {
                 buffer[DATA_BLOCK_SIZE] = '\0';
             }
 
-            void setFd(int fd) {
-                _fd = fd;
-                if (_fd > 0) {
-                    valid = true;
+            inline bool isValid() {
+                return (_fd > 0);
+            }
+
+            inline void setFd(int fd) {
+                if (isValid()) {
+                    close(_fd);
                 }
+                _fd = fd;
             }
 
             bool next(std::string & res) {
+                std::lock_guard<std::mutex> holder(readLock);
                 res.clear();
-                if (!valid) {
+                if (!isValid()) {
                     return false;
                 }
                 ssize_t rv = sread(_fd, static_cast<void *>(buffer + bufferedLength), DATA_BLOCK_SIZE - bufferedLength);
-                if (rv < 0) { // EOF
+                if (rv == 0) { // EOF
+                    res.append(buffer, bufferedLength);
+                    res.push_back('\n');
+                    setFd(INVALID);
                     bufferedLength = 0;
-                    valid = false;
+                    return true;
+                } else if (rv < 0) { // error
+                    bufferedLength = 0;
+                    setFd(INVALID);
                     return false;
                 } else {
                     size_t totalLength = rv + bufferedLength;
-                    if (totalLength == 0) {
-                        valid = false;
-                        return false;
-                    }
                     size_t cursor = totalLength - 1;
-                    while (cursor > 0 && buffer[cursor] != '\r' && buffer[cursor] != '\n') {
-                        --cursor;
+                    char c;
+                    for (cursor = totalLength - 1; cursor >= 0; --cursor) {
+                        c = buffer[cursor];
+                        if (IS_ESCAPER(c)) {
+                            int returnLength = cursor + 1;
+                            res.append(buffer, returnLength);
+                            bufferedLength = totalLength - returnLength;
+                            memmove(static_cast<void *>(buffer), static_cast<void *>(buffer + returnLength), bufferedLength);
+                            return true;
+                        }
                     }
-                    if (cursor <= 0 && buffer[0] != '\n' && buffer[0] != '\r') {
-                        D("Line out of buffer.\n");
-                        bufferedLength = 0;
-                        valid = false;
-                        return false;
-                    }
-                    int returnLength = cursor + 1;
-                    char charAtSplit = buffer[returnLength];
-                    buffer[returnLength] = '\0';
-                    res = buffer;
-                    bufferedLength = totalLength - returnLength;
-                    memmove(static_cast<void *>(buffer), static_cast<void *>(buffer + returnLength), bufferedLength);
-                    buffer[0] = charAtSplit;
-                    return true;
+                    D("Line out of buffer.\n");
+                    bufferedLength = 0;
+                    setFd(INVALID);
+                    return false;
                 }
             }
     };
@@ -96,32 +92,14 @@ namespace ch {
         protected:
             bool isServer;
             int fd;
-            std::mutex dataLock;
             std::vector<std::thread *> threads;
             BlockedBuffer buffer;
             std::string _jobFilePath;
             std::string _jobFile;
         public:
-            inline bool isValid() {
-                return (fd > 0);
-            }
-            inline void setInvalid() {
-                fd = INVALID_SOCKET;
-            }
-            bool readBlock(std::string & res) {
-                if (!isValid()) {
-                    return false;
-                } else if (isServer) {
-                    bool ret;
-                    dataLock.lock();
-                    ret = buffer.next(res);
-                    dataLock.unlock();
-                    return ret;
-                } else {
-                    D("Reading data block on client make no sense.\n");
-                    return false;
-                }
-            }
+            /*
+             * Constructor for server
+             */
             SourceManager(const char * dataFile, std::string & jobFilePath): isServer(true), _jobFilePath(jobFilePath) {
                 fd = INVALID_SOCKET;
                 if (ch::readFileAsString(jobFilePath.c_str(), _jobFile)) {
@@ -131,6 +109,30 @@ namespace ch {
                     D("Data file opened.\n");
                 }
             }
+
+            /*
+             * Constructor for clients
+             */
+            SourceManager(int sockfd, std::string & jobFilePath): isServer(false), fd(sockfd), _jobFilePath(jobFilePath) {}
+
+            inline bool isValid() {
+                return (fd > 0);
+            }
+
+            /*
+             * get data block
+             */
+            bool readBlock(std::string & res) {
+                if (!isValid()) {
+                    return false;
+                } else if (isServer) {
+                    return buffer.next(res);
+                } else {
+                    D("Reading data block on client make no sense.\n");
+                    return false;
+                }
+            }
+
             static void distributionThread(distribution_thread_in_t * args_in) {
                 int csockfd;
                 std::vector<std::pair<int, std::string> > & ips = args_in->_ips;
@@ -146,7 +148,12 @@ namespace ch {
                 }
 
                 // create client on clients
-                ssend(csockfd, static_cast<const void *>(&C_CLIENT), sizeof(char));
+                if(ssend(csockfd, static_cast<const void *>(&C_CLIENT), sizeof(char)) < 0) {
+                    L("Miss one client.\n");
+                    // TODO cope with this (fault tolerant)
+                    close(csockfd);
+                    return;
+                }
 
                 // send configuration file
                 std::string rearrangedConfiguration;
@@ -162,14 +169,15 @@ namespace ch {
                 std::string block;
                 ssize_t endSize = INVALID;
                 while ((rv = srecv(csockfd, static_cast<void *>(&receivedChar), sizeof(char))) > 0) {
-                    if (receivedChar == 'P') {
+                    if (receivedChar == CALL_POLL) {
                         if (!(source->readBlock(block))) { // end service by server
                             ssend(csockfd, static_cast<void *>(&endSize), sizeof(ssize_t));
                             D("Poll reach end of line.\n");
                             break;
                         }
                         if (!sendString(csockfd, block)) {
-                            L("Failed to send split.\n");
+                            D("Failed to send split.\n");
+                            break;
                         }
                     } else { // end service by client
                         break;
@@ -177,6 +185,7 @@ namespace ch {
                 }
                 close(csockfd);
             }
+
             void blockTillDistributionThreadsEnd() {
                 for (std::thread * t: threads) {
                     t->join();
@@ -184,12 +193,7 @@ namespace ch {
                 }
                 threads.clear();
             }
-            SourceManager(int sockfd, std::string & jobFilePath): isServer(false), fd(sockfd), _jobFilePath(jobFilePath) {}
-            ~SourceManager() {
-                if (isValid()) {
-                    close(fd);
-                }
-            }
+
             bool startFileDistributionThreads(int serverfd, std::vector<std::pair<int, std::string> > & ips, unsigned short port) {
                 if (!isValid()) {
                     return false;
@@ -206,6 +210,7 @@ namespace ch {
                 }
                 return true;
             }
+
             bool receiveAsClient(std::string & confFilePath) {
                 if (!isValid()) {
                     return false;
@@ -219,11 +224,12 @@ namespace ch {
                     return false;
                 }
                 if (!receiveFile(fd, _jobFilePath.c_str())) {
-                    L("Fail to receive configuration file.\n");
+                    L("Fail to receive job file.\n");
                     return false;
                 }
                 return true;
             }
+
             bool poll(std::string & res) {
                 res.clear();
                 if (!isValid()) {
@@ -237,10 +243,9 @@ namespace ch {
                         L("Broken pipe.\n");
                         return false;
                     } else if (!receiveString(fd, res)) {
-                        D("Fail to receive the string.\n");
-                        ssend(fd, static_cast<const void *>(&C_END), sizeof(char));
+                        D("Fail to receive the string or remote file EOF.\n");
                         close(fd);
-                        setInvalid();
+                        fd = INVALID_SOCKET;
                         return false;
                     } else {
                         return true;

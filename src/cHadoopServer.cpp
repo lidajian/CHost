@@ -55,6 +55,9 @@ bool serveServer(int sockfd) {
     std::string dataFilePath;
     std::string outputFilePath;
 
+    /*
+     * Receive parameter from starter
+     */
     if (!ch::receiveString(sockfd, dataFilePath)) {
         return false;
     }
@@ -115,16 +118,16 @@ void serve(int * in_args) {
             if (c == CALL_SERVER) {
                 if (!serveServer(sockfd)) {
                     sendFail(sockfd);
+                } else {
+                    sendSuccess(sockfd);
                 }
             } else if (c == CALL_CLIENT) {
-                if (!serveClient(sockfd)) {
-                    sendFail(sockfd);
-                }
+                serveClient(sockfd);
+                close(sockfd);
             } else {
                 D("Unsupported call.\n");
             }
         }
-        sendSuccess(sockfd);
     }
 }
 

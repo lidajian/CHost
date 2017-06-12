@@ -14,11 +14,11 @@ all: cHadoopServer cHadoopStarter
 
 cHadoopServer: $(SRC_SERVER) $(INC_DIR)/*.hpp
 	mkdir -p $(BUILD_PREFIX)
-	$(CXX) $(CFLAGS) $(LDFLAGS) -o ./bin/$@ $(SRC_SERVER)
+	$(CXX) $(CFLAGS) $(LDFLAGS) -o $(BUILD_PREFIX)/$@ $(SRC_SERVER)
 
 cHadoopStarter: $(SRC_STARTER) $(INC_DIR)/*.hpp
 	mkdir -p $(BUILD_PREFIX)
-	$(CXX) $(CFLAGS) $(LDFLAGS) -o ./bin/$@ $(SRC_STARTER)
+	$(CXX) $(CFLAGS) $(LDFLAGS) -o $(BUILD_PREFIX)/$@ $(SRC_STARTER)
 
 example: $(EXAMPLES_DIR)/*.cpp
 	cd $(EXAMPLES_DIR) && make
@@ -28,4 +28,4 @@ test: $(TEST_DIR)/*.cpp
 
 .PHONY: clean
 clean:
-	rm -rf bin/
+	rm -rf $(BUILD_PREFIX)

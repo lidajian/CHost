@@ -38,6 +38,7 @@
 #define BUFFER_SIZE 1024
 #define DATA_BLOCK_SIZE 65536
 #define MIN_VAL(a, b) ((a < b) ? a : b)
+#define IS_ESCAPER(c) (c == '\r' || c == '\n')
 
 #define IPCONFIG_FILE "/ipconfig"
 #define JOB_FILE "/job"
