@@ -169,12 +169,12 @@ namespace ch {
                 toSend = MIN_VAL(byteLeft, BUFFER_SIZE);
                 if (toSend > 0) {
                     ssize_t rv = sread(file, static_cast<void *>(buffer), toSend);
-                    if (rv != toSend) {
+                    if (rv < 0) {
                         L("Cannot read file.\n");
                         return false;
                     } else {
                         rv = ssend(sockfd, static_cast<const void *>(buffer), rv);
-                        if (rv != toSend) {
+                        if (rv < 0) {
                             L("Broken pipe.\n");
                             return false;
                         }
@@ -207,12 +207,12 @@ namespace ch {
                 byteLeft = fileSize - receivedSize;
                 toReceive = MIN_VAL(byteLeft, BUFFER_SIZE);
                 rv = srecv(sockfd, static_cast<void *>(buffer), toReceive);
-                if (rv != toReceive) {
+                if (rv < 0) {
                     L("Broken pipe.\n");
                     return false;
                 } else {
                     rv = swrite(file, static_cast<const void *>(buffer), rv);
-                    if (rv != toReceive) {
+                    if (rv < 0) {
                         L("Cannot write file.\n");
                         return false;
                     }
@@ -240,7 +240,7 @@ namespace ch {
                 toSend = MIN_VAL(byteLeft, BUFFER_SIZE);
                 if (toSend > 0) {
                     ssize_t rv = ssend(sockfd, static_cast<const void *>(strStart + sentSize), toSend);
-                    if (rv != toSend) {
+                    if (rv < 0) {
                         L("Broken pipe.\n");
                         return false;
                     }
@@ -267,7 +267,7 @@ namespace ch {
                 byteLeft = strSize - receivedSize;
                 toReceive = MIN_VAL(byteLeft, BUFFER_SIZE);
                 rv = srecv(sockfd, static_cast<void *>(buffer), toReceive);
-                if (rv != toReceive) {
+                if (rv < 0) {
                     L("Broken pipe.\n");
                     return false;
                 } else {
@@ -294,7 +294,7 @@ namespace ch {
                 toWrite = MIN_VAL(byteLeft, BUFFER_SIZE);
                 if (toWrite > 0) {
                     ssize_t rv = swrite(fd, static_cast<const void *>(strStart + writtenSize), toWrite);
-                    if (rv != toWrite) {
+                    if (rv < 0) {
                         L("Broken pipe.\n");
                         return false;
                     }
@@ -321,7 +321,7 @@ namespace ch {
                 byteLeft = strSize - readSize;
                 toRead = MIN_VAL(byteLeft, BUFFER_SIZE);
                 rv = sread(fd, static_cast<void *>(buffer), toRead);
-                if (rv != toRead) {
+                if (rv < 0) {
                     L("Broken pipe.\n");
                     return false;
                 } else {
@@ -350,7 +350,7 @@ namespace ch {
                     byteLeft = fileSize - readSize;
                     toRead = MIN_VAL(byteLeft, BUFFER_SIZE);
                     rv = sread(fd, static_cast<void *>(buffer), toRead);
-                    if (rv != toRead) {
+                    if (rv < 0) {
                         L("Broken pipe.\n");
                         return false;
                     } else {
