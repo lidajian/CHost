@@ -3,6 +3,7 @@
 
 #include <string>
 #include <iostream>
+#include <fstream>
 #include <assert.h>
 #include "utils.hpp"
 
@@ -21,9 +22,19 @@ namespace ch {
             virtual std::string toString() = 0;
             virtual bool send(int fd) = 0;
             virtual bool recv(int fd) = 0;
-            virtual bool read(int fd) = 0;
-            virtual bool write(int fd) = 0;
+            virtual std::ifstream & read(std::ifstream & is) = 0;
+            virtual std::ofstream & write(std::ofstream & os) const = 0;
+
+            friend std::ofstream & operator << (std::ofstream & os, const Base & v);
+            friend std::ifstream & operator >> (std::ifstream & is, const Base & v);
     };
+
+    std::ofstream & operator << (std::ofstream & os, const Base & v) {
+        return v.write(os);
+    }
+    std::ifstream & operator >> (std::ifstream & is, Base & v) {
+        return v.read(is);
+    }
 
     class Integer: public Base {
         public:
@@ -46,11 +57,13 @@ namespace ch {
             bool recv(int fd) {
                 return srecv(fd, static_cast<void *>(&value), sizeof(int)) == sizeof(int);
             }
-            bool read(int fd) {
-                return sread(fd, static_cast<void *>(&value), sizeof(int)) == sizeof(int);
+            std::ifstream & read(std::ifstream & is) {
+                is.read(reinterpret_cast<char *>(&value), sizeof(int));
+                return is;
             }
-            bool write(int fd) {
-                return swrite(fd, static_cast<const void *>(&value), sizeof(int)) == sizeof(int);
+            std::ofstream & write(std::ofstream & os) const {
+                os.write(reinterpret_cast<const char *>(&value), sizeof(int));
+                return os;
             }
             bool operator == (const Integer & b) const {
                 return (value == b.value);
@@ -75,61 +88,6 @@ namespace ch {
                 return (*this);
             }
             Integer & operator += (const Integer & i) {
-                value += i.value;
-                return (*this);
-            }
-    };
-
-    class Long: public Base {
-        public:
-            long value;
-            Long(long v = 0): value(v) {}
-            Long(const Long & i) {value = i.value;}
-            ~Long() {}
-            int hashCode(void) {
-                return (int)value;
-            }
-            std::string toString(void) {
-                return std::to_string(value);
-            }
-            inline static id_t getId(void) {
-                return ID_LONG;
-            }
-            bool send(int fd) {
-                return ssend(fd, static_cast<const void *>(&value), sizeof(long)) == sizeof(long);
-            }
-            bool recv(int fd) {
-                return srecv(fd, static_cast<void *>(&value), sizeof(long)) == sizeof(long);
-            }
-            bool read(int fd) {
-                return sread(fd, static_cast<void *>(&value), sizeof(long)) == sizeof(long);
-            }
-            bool write(int fd) {
-                return swrite(fd, static_cast<const void *>(&value), sizeof(long)) == sizeof(long);
-            }
-            bool operator == (const Long & b) const {
-                return (value == b.value);
-            }
-            bool operator != (const Long & b) const {
-                return (value != b.value);
-            }
-            bool operator < (const Long & b) const {
-                return (value < b.value);
-            }
-            bool operator > (const Long & b) const {
-                return (value > b.value);
-            }
-            bool operator <= (const Long & b) const {
-                return (value <= b.value);
-            }
-            bool operator >= (const Long & b) const {
-                return (value >= b.value);
-            }
-            Long & operator = (const Long & i) {
-                value = i.value;
-                return (*this);
-            }
-            Long & operator += (const Long & i) {
                 value += i.value;
                 return (*this);
             }
@@ -171,11 +129,20 @@ namespace ch {
             bool recv(int fd) {
                 return receiveString(fd, value);
             }
-            bool read(int fd) {
-                return readString(fd, value);
+            std::ifstream & read(std::ifstream & is) {
+                size_t l = 0;
+                if (is.read(reinterpret_cast<char *>(&l), sizeof(size_t))) {
+                    value.resize(l);
+                    is.read(&value[0], l);
+                }
+                return is;
             }
-            bool write(int fd) {
-                return writeString(fd, value);
+            std::ofstream & write(std::ofstream & os) const {
+                size_t l = value.size();
+                if (os.write(reinterpret_cast<const char *>(&l), sizeof(size_t))) {
+                    os.write(value.data(), l);
+                }
+                return os;
             }
             void reset(void) {
                 hash = INVALID;
@@ -233,11 +200,11 @@ namespace ch {
             bool recv(int fd) {
                 return first.recv(fd) && second.recv(fd);
             }
-            bool read(int fd) {
-                return first.read(fd) && second.read(fd);
+            std::ifstream & read(std::ifstream & is) {
+                return is >> first >> second;
             }
-            bool write(int fd) {
-                return first.write(fd) && second.write(fd);
+            std::ofstream & write(std::ofstream & os) const {
+                return os << first << second;
             }
             bool operator == (const Tuple & b) const {
                 return (first == b.first);

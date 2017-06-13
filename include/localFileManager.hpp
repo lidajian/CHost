@@ -3,7 +3,7 @@
 
 #include <vector>
 #include <string>
-#include <fcntl.h>
+#include <fstream>
 #include <random>
 #include <unistd.h> // unlink
 #include <functional> // std::bind
@@ -43,31 +43,28 @@ namespace ch {
                 for (int i = 0; i < RANDOM_FILE_NAME_LENGTH; ++i) {
                     fullPath.push_back((char)char_dice());
                 }
-                int fd = open(fullPath.c_str(), O_WRONLY | O_CREAT, S_CREAT_DEFAULT);
-                D(fullPath << ", " << fd << " created.\n");
-                if (fd < 0) {
-                    L("Cannot open file to dump.\n");
-                    return false;
-                }
-                for (int i = 0, l = received.size(); i < l; ++i) {
-                    if (!(received[i]->write(fd))) {
-                        D("Maybe no hard disk space?\n");
-                        for (; i < l; ++i) {
-                            delete received[i];
+                std::ofstream os(fullPath);
+                D(fullPath << " created.\n");
+                if (os) {
+                    for (int i = 0, l = received.size(); i < l; ++i) {
+                        if (!(os << *(received[i]))) {
+                            D("Maybe no hard disk space?\n");
+                            for (; i < l; ++i) {
+                                delete received[i];
+                            }
+                            received.clear();
+                            os.close();
+                            return false;
                         }
-                        received.clear();
-                        close(fd);
-                        return false;
+                        delete received[i];
                     }
-                    delete received[i];
                 }
+                os.close();
                 received.clear();
-                close(fd);
                 return true;
             }
             SortedStream<T> * getSortedStream() {
                 SortedStream<T> * ret = new SortedStream<T>(dumpFiles);
-                dumpFiles.clear();
                 if (ret->isValid()) {
                     return ret;
                 } else {
@@ -77,7 +74,6 @@ namespace ch {
             }
             UnsortedStream<T> * getUnsortedStream() {
                 UnsortedStream<T> * ret = new UnsortedStream<T>(dumpFiles);
-                dumpFiles.clear();
                 if (ret->isValid()) {
                     return ret;
                 } else {

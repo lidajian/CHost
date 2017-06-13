@@ -4,8 +4,8 @@
 #include <vector>
 #include <queue>
 #include <string>
+#include <fstream>
 #include <unistd.h> // unlink
-#include <fcntl.h> // close
 
 namespace ch {
 
@@ -14,7 +14,7 @@ namespace ch {
         protected:
             std::vector<std::string> _files;
             size_t i;
-            int fd;
+            std::ifstream is;
         public:
             ~UnsortedStream() {
                 for (const std::string & file: _files) {
@@ -23,25 +23,23 @@ namespace ch {
                 }
             }
             UnsortedStream(std::vector<std::string> & files): _files(files) {
-                fd = INVALID;
                 i = 0;
-                while (!isValid() && i < files.size()) {
-                    fd = open(_files[i++].c_str(), O_RDONLY);
+                while (!isValid() && i < _files.size()) {
+                    is.close();
+                    is.open(_files[i++]);
                 }
+                files.clear();
             }
             inline bool isValid() {
-                return fd >= 0;
+                return bool(is);
             }
             bool get(T & ret) {
 
-                while (!(isValid() && ret.read(fd))) {
-                    if (isValid()) {
-                        close(fd);
-                    }
+                while (!(isValid() && (is >> ret))) {
+                    is.close();
                     if (i < _files.size()) {
-                        fd = open(_files[i++].c_str(), O_RDONLY);
+                        is.open(_files[i++]);
                     } else {
-                        fd = INVALID;
                         return false;
                     }
                 }

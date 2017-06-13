@@ -12,6 +12,7 @@
 #include <arpa/inet.h>
 #include <sys/stat.h>
 #include <sys/socket.h>
+#include <stdio.h> // fseeki, ftell, rewind, fread
 #include "def.hpp"
 
 namespace ch {
@@ -101,13 +102,9 @@ namespace ch {
 
         return rv;
     }
-    off_t getFileSize(int fd) {
-        struct stat buf;
-        int rv = fstat(fd, &buf);
-        if (rv < 0) {
-            return -1;
-        }
-        return buf.st_size;
+    long getFileSize(FILE * fd) {
+        fseek(fd, 0, SEEK_END);
+        return ftell(fd);
     }
     bool fileExist(const char * path) {
         struct stat buf;
@@ -187,15 +184,18 @@ namespace ch {
 
     }
 
-
     bool sendFile(int sockfd, const char * file_path) {
         char buffer[BUFFER_SIZE];
-        int file = open(file_path, O_RDONLY);
-        if (file < 0) {
+        FILE * fd = fopen(file_path, "r");
+        if (fd == NULL) {
             D("Cannot open file to write.\n");
             return false;
         }
-        ssize_t fileSize = getFileSize(file);
+        ssize_t fileSize = getFileSize(fd);
+        if (fileSize < 0) {
+            fclose(fd);
+            return false;
+        }
 
         if (ssend(sockfd, static_cast<void *>(&fileSize), sizeof(ssize_t)) == sizeof(ssize_t)) {
             ssize_t sentSize = 0;
@@ -204,14 +204,16 @@ namespace ch {
                 byteLeft = fileSize - sentSize;
                 toSend = MIN_VAL(byteLeft, BUFFER_SIZE);
                 if (toSend > 0) {
-                    ssize_t rv = sread(file, static_cast<void *>(buffer), toSend);
-                    if (rv < 0) {
-                        D("Cannot read file.\n");
+                    ssize_t rv = fread(buffer, sizeof(char), toSend, fd);
+                    if (rv < toSend) {
+                        D("sendFile: Unexepected EOF.\n");
+                        fclose(fd);
                         return false;
                     } else {
                         rv = ssend(sockfd, static_cast<const void *>(buffer), rv);
                         if (rv < 0) {
                             D("Broken pipe.\n");
+                            fclose(fd);
                             return false;
                         }
                         sentSize += rv;
@@ -220,23 +222,23 @@ namespace ch {
             } while (sentSize < fileSize);
         } else {
             D("Cannot send file size.\n");
-            close(file);
+            fclose(fd);
             return false;
         }
 
-        close(file);
+        fclose(fd);
         return true;
     }
     bool receiveFile(int sockfd, const char * file_path) {
         char buffer[BUFFER_SIZE];
-        int file = open(file_path, O_WRONLY | O_CREAT, S_CREAT_DEFAULT);
-        if (file < 0) {
+        FILE * fd = fopen(file_path, "w");
+        if (fd == NULL) {
             D("Cannot open file to write.\n");
             return false;
         }
-        ssize_t fileSize;
+        ssize_t fileSize = INVALID;
         ssize_t rv = srecv(sockfd, static_cast<void *>(&fileSize), sizeof(ssize_t));
-        if (rv == sizeof(ssize_t) && fileSize > 0) {
+        if (rv == sizeof(ssize_t) && fileSize >= 0) {
             ssize_t receivedSize = 0;
             ssize_t byteLeft, toReceive;
             do {
@@ -245,11 +247,13 @@ namespace ch {
                 rv = srecv(sockfd, static_cast<void *>(buffer), toReceive);
                 if (rv < 0) {
                     D("Broken pipe.\n");
+                    fclose(fd);
                     return false;
                 } else {
-                    rv = swrite(file, static_cast<const void *>(buffer), rv);
-                    if (rv < 0) {
+                    rv = fwrite(buffer, sizeof(char), rv, fd);
+                    if (rv == 0) {
                         D("Cannot write file.\n");
+                        fclose(fd);
                         return false;
                     }
                     receivedSize += rv;
@@ -257,10 +261,10 @@ namespace ch {
             } while (receivedSize < fileSize);
         } else {
             D("Cannot receive file size or file size is 0.\n");
-            close(file);
+            fclose(fd);
             return false;
         }
-        close(file);
+        fclose(fd);
         return true;
     }
 
@@ -296,7 +300,8 @@ namespace ch {
         char buffer[BUFFER_SIZE];
         ssize_t strSize;
         ssize_t rv = precv(sockfd, static_cast<void *>(&strSize), sizeof(ssize_t));
-        if (rv == sizeof(ssize_t) && strSize >= 0) {
+        if (rv > 0 && strSize >= 0) {
+            str.reserve(strSize);
             ssize_t receivedSize = 0;
             ssize_t byteLeft, toReceive;
             do {
@@ -318,93 +323,28 @@ namespace ch {
         return true;
     }
 
-    bool writeString(int fd, std::string & str) {
-        ssize_t strSize = str.size();
-
-        if (swrite(fd, static_cast<const void *>(&strSize), sizeof(ssize_t)) == sizeof(ssize_t)) {
-            const char * strStart = str.data();
-            ssize_t writtenSize = 0;
-            ssize_t byteLeft, toWrite;
-            do {
-                byteLeft = strSize - writtenSize;
-                toWrite = MIN_VAL(byteLeft, BUFFER_SIZE);
-                if (toWrite > 0) {
-                    ssize_t rv = swrite(fd, static_cast<const void *>(strStart + writtenSize), toWrite);
-                    if (rv < 0) {
-                        D("Broken pipe.\n");
-                        return false;
-                    }
-                    writtenSize += toWrite;
-                }
-            } while (writtenSize < strSize);
-            return true;
-        } else {
-            D("Cannot write string size.\n");
-        }
-
-        return false;
-    }
-
-    bool readString(int fd, std::string & str) {
-        str.clear();
-        char buffer[BUFFER_SIZE];
-        ssize_t strSize;
-        ssize_t rv = sread(fd, static_cast<void *>(&strSize), sizeof(ssize_t));
-        if (rv == sizeof(ssize_t) && strSize >= 0) {
-            ssize_t readSize = 0;
-            ssize_t byteLeft, toRead;
-            do {
-                byteLeft = strSize - readSize;
-                toRead = MIN_VAL(byteLeft, BUFFER_SIZE);
-                rv = sread(fd, static_cast<void *>(buffer), toRead);
-                if (rv < 0) {
-                    D("Broken pipe.\n");
-                    return false;
-                } else {
-                    str.append(buffer, rv);
-                    readSize += rv;
-                }
-            } while (readSize < strSize);
-        } else {
-            D("Cannot read string size.\n");
-            return false;
-        }
-        return true;
-    }
-
     bool readFileAsString(const char * file_path, std::string & str) {
         str.clear();
-        char buffer[BUFFER_SIZE];
-        int fd = open(file_path, O_RDONLY);
-        if (fd > 0) {
-            ssize_t fileSize = getFileSize(fd);
-            ssize_t readSize = 0;
-            ssize_t byteLeft, toRead;
-            if (fileSize > 0) {
-                ssize_t rv;
-                do {
-                    byteLeft = fileSize - readSize;
-                    toRead = MIN_VAL(byteLeft, BUFFER_SIZE);
-                    rv = sread(fd, static_cast<void *>(buffer), toRead);
-                    if (rv < 0) {
-                        D("Broken pipe.\n");
-                        return false;
-                    } else {
-                        str.append(buffer, rv);
-                        readSize += rv;
-                    }
-                } while (readSize < fileSize);
-                close(fd);
-                return true;
-            } else {
-                D("Empty file.\n");
-                close(fd);
-                return false;
-            }
-        } else {
-            D("File not found.\n");
+        FILE * fd = fopen(file_path, "r");
+        if (fd == NULL) {
             return false;
         }
+        long tempSize = getFileSize(fd);
+        if (tempSize < 0) {
+            fclose(fd);
+            return false;
+        }
+        size_t size = tempSize;
+        rewind(fd);
+        str.resize(size);
+        size_t rv = fread(&str[0], sizeof(char), size, fd);
+        if (rv != size) {
+            fclose(fd);
+            return false;
+        }
+        fclose(fd);
+        return true;
+
     }
 
 }

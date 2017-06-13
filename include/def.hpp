@@ -28,8 +28,8 @@
 #define RES_SUCCESS 0
 #define RES_FAIL '\x1'
 
-#define INVALID_SOCKET (-1)
-#define INVALID (-1)
+#define INVALID_SOCKET (~0)
+#define INVALID (~0)
 
 #define STREAMMANAGER_PORT 8711
 #define SERVER_PORT 8712

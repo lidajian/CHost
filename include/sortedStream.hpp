@@ -4,8 +4,8 @@
 #include <vector>
 #include <queue>
 #include <string>
+#include <fstream>
 #include <unistd.h> // unlink
-#include <fcntl.h> // close
 
 namespace ch {
 
@@ -24,11 +24,13 @@ namespace ch {
     class SortedStream {
         protected:
             std::vector<std::string> _files;
-            std::priority_queue<std::pair<T, int>, std::vector<std::pair<T, int> >, pair_comparator<T, int, true> > minHeap;
+            std::priority_queue<std::pair<T, std::ifstream *>, std::vector<std::pair<T, std::ifstream *> >, pair_comparator<T, std::ifstream *, true> > minHeap;
         public:
             ~SortedStream() {
                 while (minHeap.size()) {
-                    close(minHeap.top().second);
+                    std::ifstream * is = minHeap.top().second;
+                    is->close();
+                    delete is;
                     minHeap.pop();
                 }
                 for (const std::string & file: _files) {
@@ -39,32 +41,33 @@ namespace ch {
             SortedStream(std::vector<std::string> & files): _files(files) {
                 T temp;
                 for (const std::string & file: files) {
-                    int fd = open(file.c_str(), O_RDONLY);
-                    if (fd < 0) {
-                        D(file << " cannot be opened. " << strerror(errno) << "\n");
-                    } else if (temp.read(fd)) {
-                        D("sorted: " << fd << " opened.\n");
-                        minHeap.push(std::pair<T, int>(temp, fd));
+                    std::ifstream * is = new std::ifstream(file);
+                    if ((*is) && ((*is) >> temp)) {
+                        minHeap.push(std::pair<T, std::ifstream *>(temp, is));
                     } else {
-                        D(file << " is empty!\n");
-                        close(fd);
+                        is->close();
+                        delete is;
                     }
                 }
+                files.clear();
             }
             inline bool isValid() {
                 return (minHeap.size() != 0);
             }
             bool get(T & ret) {
+                L("sorted: get called.\n");
                 if (minHeap.empty()) {
                     return false;
                 }
-                std::pair<T, int> top(std::move(minHeap.top()));
+                std::pair<T, std::ifstream *> top = minHeap.top();
                 ret = top.first;
                 minHeap.pop();
-                if(top.first.read(top.second)) {
+                std::ifstream * is = top.second;
+                if((*is) >> top.first) {
                     minHeap.push(top);
                 } else {
-                    close(top.second);
+                    is->close();
+                    delete is;
                 }
                 return true;
             }
