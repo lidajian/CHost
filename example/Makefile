@@ -3,7 +3,7 @@ JOB_CPP = wordcount.cpp
 BUILD_PREFIX = ../bin
 
 CXX = g++
-CFLAGS += -D _LOG -Wall -std=c++11 -I$(INC_DIR)# -D _DEBUG
+CFLAGS += -D _LOG -Wall -std=c++11 -I$(INC_DIR) -D _DEBUG
 LDFLAGS += -shared -fPIC
 
 all: job

@@ -29,6 +29,38 @@ namespace ch {
         }
         return rv;
     }
+    ssize_t psend(int fd, const void * buffer, size_t len) {
+        off_t offset = 0;
+        const char * cbuf = reinterpret_cast<const char *>(buffer);
+        ssize_t sent;
+        while ((sent = send(fd, cbuf + offset, len, 0)) > 0 || (sent == -1 && errno == EINTR)) {
+            if (sent > 0) {
+                offset += sent;
+                len -= sent;
+            }
+        }
+        if (len != 0) {
+            return INVALID;
+        } else {
+            return offset;
+        }
+    }
+    ssize_t precv(int fd, void * buffer, size_t len) {
+        off_t offset = 0;
+        char * cbuf = reinterpret_cast<char *>(buffer);
+        ssize_t received;
+        while ((received = recv(fd, cbuf + offset, len, 0)) > 0 || (received == -1 && errno == EINTR)) {
+            if (received > 0) {
+                offset += received;
+                len -= received;
+            }
+        }
+        if (len != 0) {
+            return INVALID;
+        } else {
+            return offset;
+        }
+    }
     ssize_t sread(int fd, void * buffer, size_t size) {
         int rv = read(fd, buffer, size);
         if (rv < 0) {
@@ -235,7 +267,7 @@ namespace ch {
     bool sendString(int sockfd, std::string & str) {
         ssize_t strSize = str.size();
 
-        if (ssend(sockfd, static_cast<const void *>(&strSize), sizeof(ssize_t)) == sizeof(ssize_t)) {
+        if (psend(sockfd, static_cast<const void *>(&strSize), sizeof(ssize_t)) == sizeof(ssize_t)) {
             const char * strStart = str.data();
             ssize_t sentSize = 0;
             ssize_t byteLeft, toSend;
@@ -248,7 +280,7 @@ namespace ch {
                         D("Broken pipe.\n");
                         return false;
                     }
-                    sentSize += toSend;
+                    sentSize += rv;
                 }
             } while (sentSize < strSize);
             return true;
@@ -263,7 +295,7 @@ namespace ch {
         str.clear();
         char buffer[BUFFER_SIZE];
         ssize_t strSize;
-        ssize_t rv = srecv(sockfd, static_cast<void *>(&strSize), sizeof(ssize_t));
+        ssize_t rv = precv(sockfd, static_cast<void *>(&strSize), sizeof(ssize_t));
         if (rv == sizeof(ssize_t) && strSize >= 0) {
             ssize_t receivedSize = 0;
             ssize_t byteLeft, toReceive;

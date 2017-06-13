@@ -65,9 +65,6 @@ def deploy_on(ip, pem, git_user, git_password):
         print 'Compiling'
         ssh.sendline('make')
 
-        print 'Running server'
-        ssh.sendline('./bin/cHadoopServer > ~/.cHadoop/server.log &')
-
         ssh.sendline('exit')
         r = ssh.read()
         done = True
