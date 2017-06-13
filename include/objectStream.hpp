@@ -51,7 +51,11 @@ namespace ch {
             }
             bool send(T & v) {
                 D("Sending: " << v.toString() << std::endl);
-                return v.send(_sockfd);
+                id_t id = T::getId();
+                if (ssend(_sockfd, static_cast<const void *>(&id), sizeof(id_t)) == sizeof(id_t)) {
+                    return v.send(_sockfd);
+                }
+                return false;
             }
     };
 
@@ -70,13 +74,19 @@ namespace ch {
                 }
             }
             T * recv(void) {
-                T * v = new T();
-                if (!(v->recv(_sockfd))) {
-                    delete v;
-                    return NULL;
+                id_t id = ID_INVALID;
+                if (srecv(_sockfd, static_cast<void *>(&id), sizeof(id_t)) == sizeof(id_t)) {
+                    if (id == T::getId()) {
+                        T * v = new T();
+                        if (!(v->recv(_sockfd))) {
+                            delete v;
+                            return NULL;
+                        }
+                        D("Received: " << (v->toString()) << std::endl);
+                        return v;
+                    }
                 }
-                D("Received: " << (v->toString()) << std::endl);
-                return v;
+                return NULL;
             }
     };
 }

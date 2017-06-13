@@ -228,20 +228,10 @@ namespace ch {
                 return (T1::getId() << 4) | T2::getId();
             }
             bool send(int fd) {
-                id_t id = getId();
-                if (ssend(fd, static_cast<const void *>(&id), sizeof(id_t)) == sizeof(id_t)) {
-                    return first.send(fd) && second.send(fd);
-                }
-                return false;
+                return first.send(fd) && second.send(fd);
             }
             bool recv(int fd) {
-                id_t id = ID_INVALID;
-                if (srecv(fd, static_cast<void *>(&id), sizeof(id_t)) == sizeof(id_t)) {
-                    if (id == getId()) {
-                        return first.recv(fd) && second.recv(fd);
-                    }
-                }
-                return false;
+                return first.recv(fd) && second.recv(fd);
             }
             bool read(int fd) {
                 return first.read(fd) && second.read(fd);
