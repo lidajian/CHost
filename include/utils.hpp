@@ -1,17 +1,18 @@
 #ifndef UTILS_H
 #define UTILS_H
 
-#include <iostream>
-#include <fstream>
-#include <string>
-#include <vector>
-#include <string.h>
-#include <unistd.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
-#include <sys/stat.h>
-#include <sys/socket.h>
+#include <string.h> // memset
+#include <unistd.h> // access
+#include <netinet/in.h> // sockaddr_in
+#include <arpa/inet.h> // htons, inet_addr
+#include <sys/socket.h> // connect, bind, send, recv, socket, listen
 #include <stdio.h> // fseek, ftell, rewind, fread, ...
+#include <stdlib.h> // system
+
+#include <fstream> // ifstream
+#include <string> // string
+#include <vector> // vector
+
 #include "def.hpp"
 
 namespace ch {
@@ -47,7 +48,7 @@ namespace ch {
             return offset;
         }
     }
-    int sconnect(int & sockfd, const char * ip, unsigned short port) {
+    int sconnect(int & sockfd, const char * ip, const unsigned short port) {
 
         sockaddr_in addr;
 
@@ -78,10 +79,9 @@ namespace ch {
         return ftell(fd);
     }
     bool fileExist(const char * path) {
-        struct stat buf;
-        return (stat(path, &buf) >= 0);
+        return access(path, F_OK) != INVALID;
     }
-    bool prepareServer(int & serverfd, unsigned short port){
+    bool prepareServer(int & serverfd, const unsigned short port){
         sockaddr_in addr;
 
         serverfd = socket(AF_INET, SOCK_STREAM, 0);
@@ -127,7 +127,7 @@ namespace ch {
         return true;
     }
 
-    void rearrangeIPs(std::vector<std::pair<int, std::string> > & ips, std::string & file, int indexToHead) {
+    void rearrangeIPs(const std::vector<std::pair<int, std::string> > & ips, std::string & file, const int indexToHead) {
         file = std::to_string(ips[indexToHead].first) + " " + ips[indexToHead].second + "\n";
         for (int i = 0, l = ips.size(); i < l; ++i) {
             if (i != indexToHead) {
@@ -155,7 +155,7 @@ namespace ch {
 
     }
 
-    bool sendFile(int sockfd, const char * file_path) {
+    bool sendFile(const int sockfd, const char * file_path) {
         char buffer[BUFFER_SIZE];
         FILE * fd = fopen(file_path, "r");
         if (fd == NULL) {
@@ -200,7 +200,7 @@ namespace ch {
         fclose(fd);
         return true;
     }
-    bool receiveFile(int sockfd, const char * file_path) {
+    bool receiveFile(const int sockfd, const char * file_path) {
         char buffer[BUFFER_SIZE];
         FILE * fd = fopen(file_path, "w");
         if (fd == NULL) {
@@ -239,7 +239,7 @@ namespace ch {
         return true;
     }
 
-    bool sendString(int sockfd, std::string & str) {
+    bool sendString(const int sockfd, const std::string & str) {
         ssize_t strSize = str.size();
 
         if (psend(sockfd, static_cast<const void *>(&strSize), sizeof(ssize_t)) == sizeof(ssize_t)) {
@@ -266,7 +266,7 @@ namespace ch {
         return false;
     }
 
-    bool receiveString(int sockfd, std::string & str) {
+    bool receiveString(const int sockfd, std::string & str) {
         str.clear();
         char buffer[BUFFER_SIZE];
         ssize_t strSize;

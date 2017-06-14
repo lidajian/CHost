@@ -1,6 +1,8 @@
 #ifndef DEF_H
 #define DEF_H
 
+#include <iostream>
+
 // debug output
 #ifndef _DEBUG
 #define D(x)

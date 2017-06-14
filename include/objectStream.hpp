@@ -1,15 +1,16 @@
+/*
+ * Stream transporting objects (derives of TypeBase)
+ */
+
 #ifndef OBJECTSTREAM_H
 #define OBJECTSTREAM_H
 
-#include <arpa/inet.h>
-#include <netinet/in.h>
-#include <sys/socket.h>
-#include <unistd.h>
-#include <string.h>
-#include <string>
-#include <fstream>
-#include <vector>
-#include "type.hpp"
+#include <unistd.h> // close
+
+#include <string> // string
+#include <vector> // vector
+
+#include "type.hpp" // id_t
 
 namespace ch {
 
@@ -26,7 +27,7 @@ namespace ch {
             virtual void close(void) = 0;
     };
 
-    template <class T>
+    template <class DataType>
     class ObjectOutputStream: public ObjectStream {
         public:
             ObjectOutputStream() {}
@@ -49,9 +50,9 @@ namespace ch {
                     _sockfd = INVALID_SOCKET;
                 }
             }
-            bool send(T & v) {
-                D("Sending: " << v.toString() << std::endl);
-                id_t id = T::getId();
+            bool send(DataType & v) {
+                D("Sending: " << v << std::endl);
+                id_t id = DataType::getId();
                 if (psend(_sockfd, static_cast<const void *>(&id), sizeof(id_t)) == sizeof(id_t)) {
                     return v.send(_sockfd);
                 }
@@ -59,7 +60,7 @@ namespace ch {
             }
     };
 
-    template <class T>
+    template <class DataType>
     class ObjectInputStream: public ObjectStream {
         public:
             ObjectInputStream(int sockfd): ObjectStream(sockfd) {}
@@ -73,16 +74,16 @@ namespace ch {
                     _sockfd = INVALID_SOCKET;
                 }
             }
-            T * recv(void) {
+            DataType * recv(void) {
                 id_t id = ID_INVALID;
                 if (precv(_sockfd, static_cast<void *>(&id), sizeof(id_t)) == sizeof(id_t)) {
-                    if (id == T::getId()) {
-                        T * v = new T();
+                    if (id == DataType::getId()) {
+                        DataType * v = new DataType();
                         if (!(v->recv(_sockfd))) {
                             delete v;
                             return NULL;
                         }
-                        D("Received: " << (v->toString()) << std::endl);
+                        D("Received: " << (*v) << std::endl);
                         return v;
                     }
                 }

@@ -1,24 +1,29 @@
+/*
+ * Manager intermediate data
+ */
+
 #ifndef DATAMANAGER_H
 #define DATAMANAGER_H
 
-#include <vector>
+#include <vector> // vector
 #include <mutex> // mutex
 #include <algorithm> // sort
-#include "localFileManager.hpp"
-#include "sortedStream.hpp"
-#include "unsortedStream.hpp"
+
+#include "localFileManager.hpp" // LocalFileManager
+#include "sortedStream.hpp" // SortedStream
+#include "unsortedStream.hpp" // UnsortedStream
 
 namespace ch {
-    template <class T>
+    template <class DataType>
     class DataManager {
         protected:
             bool _presort;
             const size_t _maxDataSize;
-            std::vector<T *> _data;
+            std::vector<DataType *> _data;
             std::mutex _dataLock;
-            LocalFileManager<T> fileManager;
+            LocalFileManager<DataType> fileManager;
         public:
-            static bool comp (const T * l, const T * r) {
+            static bool comp (const DataType * l, const DataType * r) {
                 return (*l) < (*r);
             }
             void clear() {
@@ -29,7 +34,7 @@ namespace ch {
             ~DataManager() {
                 clear();
             }
-            bool store(T * v) {
+            bool store(DataType * v) {
                 std::lock_guard<std::mutex> holder(_dataLock);
                 _data.push_back(v);
                 if (_data.size() == _maxDataSize) {
@@ -38,8 +43,8 @@ namespace ch {
                 }
                 return true;
             }
-            bool store(T & v) {
-                T * nv = new T(v);
+            bool store(DataType & v) {
+                DataType * nv = new DataType(v);
                 std::lock_guard<std::mutex> holder(_dataLock);
                 _data.push_back(nv);
                 if (_data.size() == _maxDataSize) {
@@ -51,7 +56,7 @@ namespace ch {
             void setPresort(bool presort) {
                 _presort = presort;
             }
-            SortedStream<T> * getSortedStream() {
+            SortedStream<DataType> * getSortedStream() {
                 if (!_presort) {
                     return NULL;
                 }
@@ -61,7 +66,7 @@ namespace ch {
                 }
                 return fileManager.getSortedStream();
             }
-            UnsortedStream<T> * getUnsortedStream () {
+            UnsortedStream<DataType> * getUnsortedStream () {
                 if (_data.size() != 0) {
                     fileManager.dumpToFile(_data);
                 }

@@ -1,15 +1,15 @@
 #ifndef UNSORTEDSTREAM_H
 #define UNSORTEDSTREAM_H
 
-#include <vector>
-#include <queue>
-#include <string>
-#include <fstream>
 #include <unistd.h> // unlink
+
+#include <vector> // vector
+#include <string> // string
+#include <fstream> // ifstream
 
 namespace ch {
 
-    template <class T>
+    template <class DataType>
     class UnsortedStream {
         protected:
             std::vector<std::string> _files;
@@ -33,7 +33,7 @@ namespace ch {
             inline bool isValid() {
                 return bool(is);
             }
-            bool get(T & ret) {
+            bool get(DataType & ret) {
 
                 while (!(isValid() && (is >> ret))) {
                     is.close();

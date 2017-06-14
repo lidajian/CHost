@@ -1,10 +1,12 @@
 #ifndef TYPE_HPP
 #define TYPE_HPP
 
-#include <string>
-#include <iostream>
-#include <fstream>
 #include <assert.h>
+
+#include <string> // string
+#include <iostream> // ostream
+#include <fstream> // ifstream, ofstream
+
 #include "utils.hpp"
 
 namespace ch {
@@ -12,31 +14,35 @@ namespace ch {
 
     typedef unsigned char id_t;
 
-    class Base {
+    class TypeBase {
         public:
-            virtual ~Base() {}
+            virtual ~TypeBase() {}
             inline static id_t getId(void) {
                 return ID_INVALID;
             }
             virtual int hashCode(void) = 0;
-            virtual std::string toString() = 0;
-            virtual bool send(int fd) = 0;
+            virtual std::string toString() const = 0;
+            virtual bool send(int fd) const = 0;
             virtual bool recv(int fd) = 0;
             virtual std::ifstream & read(std::ifstream & is) = 0;
             virtual std::ofstream & write(std::ofstream & os) const = 0;
 
-            friend std::ofstream & operator << (std::ofstream & os, const Base & v);
-            friend std::ifstream & operator >> (std::ifstream & is, const Base & v);
+            friend std::ofstream & operator << (std::ofstream & os, const TypeBase & v);
+            friend std::ifstream & operator >> (std::ifstream & is, const TypeBase & v);
+            friend std::ostream & operator << (std::ostream & os, const TypeBase & v);
     };
 
-    std::ofstream & operator << (std::ofstream & os, const Base & v) {
+    std::ofstream & operator << (std::ofstream & os, const TypeBase & v) {
         return v.write(os);
     }
-    std::ifstream & operator >> (std::ifstream & is, Base & v) {
+    std::ifstream & operator >> (std::ifstream & is, TypeBase & v) {
         return v.read(is);
     }
+    std::ostream & operator << (std::ostream & os, const TypeBase & v) {
+        return os << v.toString();
+    }
 
-    class Integer: public Base {
+    class Integer: public TypeBase {
         public:
             int value;
             Integer(int v = 0): value(v) {}
@@ -45,13 +51,13 @@ namespace ch {
             int hashCode(void) {
                 return value;
             }
-            std::string toString(void) {
+            std::string toString(void) const {
                 return std::to_string(value);
             }
             inline static id_t getId(void) {
                 return ID_INTEGER;
             }
-            bool send(int fd) {
+            bool send(int fd) const {
                 return psend(fd, static_cast<const void *>(&value), sizeof(int)) == sizeof(int);
             }
             bool recv(int fd) {
@@ -93,7 +99,7 @@ namespace ch {
             }
     };
 
-    class String: public Base {
+    class String: public TypeBase {
         private:
             int hash;
         public:
@@ -117,13 +123,13 @@ namespace ch {
                 }
                 return h;
             }
-            std::string toString(void) {
+            std::string toString(void) const {
                 return "\"" + value + "\"";
             }
             inline static id_t getId(void) {
                 return ID_STRING;
             }
-            bool send(int fd) {
+            bool send(int fd) const {
                 return sendString(fd, value);
             }
             bool recv(int fd) {
@@ -176,25 +182,25 @@ namespace ch {
             }
     };
 
-    template <class T1, class T2>
-    class Tuple: public Base {
+    template <class DataType_1, class DataType_2>
+    class Tuple: public TypeBase {
         public:
-            T1 first;
-            T2 second;
+            DataType_1 first;
+            DataType_2 second;
             Tuple() {}
-            Tuple(T1 & v1, T2 & v2): first(v1), second(v2) {}
-            Tuple(const Tuple<T1, T2> & t): first(t.first), second(t.second) {}
+            Tuple(DataType_1 & v1, DataType_2 & v2): first(v1), second(v2) {}
+            Tuple(const Tuple<DataType_1, DataType_2> & t): first(t.first), second(t.second) {}
             ~Tuple() {}
             int hashCode(void) {
                 return first.hashCode();
             }
-            std::string toString() {
+            std::string toString() const {
                 return "(" + first.toString() + ", " + second.toString() + ")";
             }
             inline static id_t getId(void) {
-                return (T1::getId() << 4) | T2::getId();
+                return (DataType_1::getId() << 4) | DataType_2::getId();
             }
-            bool send(int fd) {
+            bool send(int fd) const {
                 return first.send(fd) && second.send(fd);
             }
             bool recv(int fd) {
@@ -206,30 +212,30 @@ namespace ch {
             std::ofstream & write(std::ofstream & os) const {
                 return os << first << second;
             }
-            bool operator == (const Tuple & b) const {
+            bool operator == (const Tuple<DataType_1, DataType_2> & b) const {
                 return (first == b.first);
             }
-            bool operator != (const Tuple & b) const {
+            bool operator != (const Tuple<DataType_1, DataType_2> & b) const {
                 return (first != b.first);
             }
-            bool operator < (const Tuple & b) const {
+            bool operator < (const Tuple<DataType_1, DataType_2> & b) const {
                 return (first < b.first);
             }
-            bool operator > (const Tuple & b) const {
+            bool operator > (const Tuple<DataType_1, DataType_2> & b) const {
                 return (first > b.first);
             }
-            bool operator <= (const Tuple & b) const {
+            bool operator <= (const Tuple<DataType_1, DataType_2> & b) const {
                 return (first <= b.first);
             }
-            bool operator >= (const Tuple & b) const {
+            bool operator >= (const Tuple<DataType_1, DataType_2> & b) const {
                 return (first >= b.first);
             }
-            Tuple & operator = (const Tuple & t) {
+            Tuple & operator = (const Tuple<DataType_1, DataType_2> & t) {
                 first = t.first;
                 second = t.second;
                 return (*this);
             }
-            Tuple & operator += (const Tuple & t) {
+            Tuple & operator += (const Tuple<DataType_1, DataType_2> & t) {
                 second += t.second;
                 return (*this);
             }

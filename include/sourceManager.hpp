@@ -1,13 +1,15 @@
+/*
+ * Manage job resource (configuration file, job library, data file)
+ */
+
 #ifndef SOURCE_MANAGER_H
 #define SOURCE_MANAGER_H
 
-#include <thread>
-#include <mutex>
-#include <vector>
-#include <string>
-#include <string.h>
-#include <stdio.h> // fopen, fread, ...
+#include <thread> // thread
+#include <vector> // vector
+#include <string> // string
 #include "utils.hpp"
+#include "splitter.hpp"
 
 namespace ch {
 
@@ -16,95 +18,23 @@ namespace ch {
     const char C_POLL = CALL_POLL;
     const char C_END = CALL_END;
 
-    class SourceManager;
-
-    struct distribution_thread_in_t {
-        int _ind;
-        std::vector<std::pair<int, std::string> > & _ips;
-        unsigned short _port;
-        SourceManager * _source;
-
-        explicit distribution_thread_in_t(int ind, std::vector<std::pair<int, std::string> > & ips, unsigned short port, SourceManager * source): _ind(ind), _ips(ips), _port(port), _source(source) {}
-    };
-
-    class BlockedBuffer {
-        protected:
-            FILE * _fd;
-            char buffer[DATA_BLOCK_SIZE + 1];
-            std::mutex readLock;
-            size_t bufferedLength; // byte cached in buffer
-
-        public:
-            BlockedBuffer(): _fd(NULL), bufferedLength(0) {
-                buffer[DATA_BLOCK_SIZE] = '\0';
-            }
-
-            ~BlockedBuffer() {
-                setFd(NULL);
-            }
-
-            bool open(const char * file) {
-                setFd(NULL);
-                _fd = fopen(file, "r");
-                return isValid();
-            }
-
-            inline bool isValid() {
-                return (_fd != NULL);
-            }
-
-            void setFd(FILE * fd) {
-                if (isValid()) {
-                    fclose(_fd);
-                }
-                _fd = fd;
-                bufferedLength = 0;
-            }
-
-            bool next(std::string & res) {
-                std::lock_guard<std::mutex> holder(readLock);
-                res.clear();
-                if (!isValid()) {
-                    return false;
-                }
-                size_t rv = fread(buffer + bufferedLength, sizeof(char), DATA_BLOCK_SIZE - bufferedLength, _fd);
-                if (rv == 0) { // EOF
-                    if (bufferedLength == 0) {
-                        setFd(NULL);
-                        return false;
-                    } else {
-                        res.append(buffer, bufferedLength);
-                        res.push_back('\n');
-                        setFd(NULL);
-                        return true;
-                    }
-                } else {
-                    size_t totalLength = rv + bufferedLength;
-                    size_t cursor = totalLength - 1;
-                    char c;
-                    for (cursor = totalLength - 1; cursor >= 0; --cursor) {
-                        c = buffer[cursor];
-                        if (IS_ESCAPER(c)) {
-                            int returnLength = cursor + 1;
-                            res.append(buffer, returnLength);
-                            bufferedLength = totalLength - returnLength;
-                            memmove(static_cast<void *>(buffer), static_cast<void *>(buffer + returnLength), bufferedLength);
-                            return true;
-                        }
-                    }
-                    D("Line out of buffer.\n");
-                    setFd(NULL);
-                    return false;
-                }
-            }
-    };
-
     class SourceManager {
         protected:
+
+            // argument for distribution thread
+            struct distribution_thread_in_t {
+                int _ind;
+                std::vector<std::pair<int, std::string> > & _ips;
+                unsigned short _port;
+                SourceManager * _source;
+
+                explicit distribution_thread_in_t(int ind, std::vector<std::pair<int, std::string> > & ips, unsigned short port, SourceManager * source): _ind(ind), _ips(ips), _port(port), _source(source) {}
+            };
+
             bool isServer;
             int fd;
             std::vector<std::thread *> threads;
-            BlockedBuffer buffer;
+            Splitter splitter;
             std::string _jobFilePath;
             std::string _jobFile;
         public:
@@ -115,7 +45,7 @@ namespace ch {
                 fd = INVALID_SOCKET;
                 if (ch::readFileAsString(jobFilePath.c_str(), _jobFile)) {
                     D("Attempt to open data file.\n");
-                    fd = (buffer.open(dataFile) ? ~INVALID : INVALID);
+                    fd = (splitter.open(dataFile) ? -INVALID : INVALID);
                     D("Data file opened.\n");
                 }
             }
@@ -136,7 +66,7 @@ namespace ch {
                 if (!isValid()) {
                     return false;
                 } else if (isServer) {
-                    return buffer.next(res);
+                    return splitter.next(res);
                 } else {
                     D("Reading data block on client make no sense.\n");
                     return false;

@@ -1,6 +1,8 @@
 #ifndef PARTITIONER_H
 #define PARTITIONER_H
 
+#include <climits> // INT_MIN
+
 namespace ch {
 
     class Partitioner {

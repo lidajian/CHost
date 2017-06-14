@@ -1,19 +1,25 @@
+/*
+ * Manager temporary files in local machine
+ */
+
 #ifndef LOCALFILEMANAGER_H
 #define LOCALFILEMANAGER_H
 
-#include <vector>
-#include <string>
-#include <fstream>
-#include <random>
 #include <unistd.h> // unlink
+
+#include <vector> // vector
+#include <string> // string
+#include <fstream> // ofstream
+#include <random> // random_device, default_random_engine, uniform_int_distribution
 #include <functional> // std::bind
+
 #include "def.hpp" // RANDOM_FILE_NAME_LENGTH
 #include "sortedStream.hpp" // SortedStream
 #include "unsortedStream.hpp" // UnsortedStream
 
 namespace ch {
 
-    template <class T>
+    template <class DataType>
     class LocalFileManager {
         protected:
             // file paths it manages
@@ -31,7 +37,7 @@ namespace ch {
             ~LocalFileManager() {
                 clear();
             }
-            bool dumpToFile(std::vector<T *> & received) {
+            bool dumpToFile(std::vector<DataType *> & received) {
                 // generate random file name
                 std::random_device d;
                 std::default_random_engine generator(d());
@@ -63,8 +69,8 @@ namespace ch {
                 received.clear();
                 return true;
             }
-            SortedStream<T> * getSortedStream() {
-                SortedStream<T> * ret = new SortedStream<T>(dumpFiles);
+            SortedStream<DataType> * getSortedStream() {
+                SortedStream<DataType> * ret = new SortedStream<DataType>(dumpFiles);
                 if (ret->isValid()) {
                     return ret;
                 } else {
@@ -72,8 +78,8 @@ namespace ch {
                     return NULL;
                 }
             }
-            UnsortedStream<T> * getUnsortedStream() {
-                UnsortedStream<T> * ret = new UnsortedStream<T>(dumpFiles);
+            UnsortedStream<DataType> * getUnsortedStream() {
+                UnsortedStream<DataType> * ret = new UnsortedStream<DataType>(dumpFiles);
                 if (ret->isValid()) {
                     return ret;
                 } else {

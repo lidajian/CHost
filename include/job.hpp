@@ -1,8 +1,13 @@
+/*
+ * Header for all jobs
+ */
+
 #ifndef JOB_H
 #define JOB_H
 
-#include <string>
-#include <vector>
+#include <string> // string
+#include <vector> // vector
+
 #include "sourceManager.hpp"
 
 namespace ch {
