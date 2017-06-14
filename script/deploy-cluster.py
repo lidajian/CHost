@@ -86,6 +86,8 @@ if __name__ == '__main__':
         failedIP = []
         with open(sys.argv[1]) as confFile:
             for ip in confFile:
+                if ('#' in ip) or ('.' not in ip):
+                    continue
                 tries = 0
                 while tries < MAX_TRY:
                     if install_packages(ip, sys.argv[2]):

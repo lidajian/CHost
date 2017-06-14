@@ -64,4 +64,6 @@ if __name__ == '__main__':
     else:
         with open(sys.argv[1]) as confFile:
             for ip in confFile:
+                if ('#' in ip) or ('.' not in ip):
+                    continue
                 kill_server(ip, sys.argv[2])
