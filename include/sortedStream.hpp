@@ -54,7 +54,22 @@ namespace ch {
                         delete is;
                     }
                 }
-                files.clear();
+            }
+            template <class Vec_Str_Iter>
+            SortedStream(const Vec_Str_Iter & begin, const Vec_Str_Iter & end) {
+                DataType temp;
+                Vec_Str_Iter it = begin;
+                while (it < end) {
+                    _files.push_back(*it);
+                    std::ifstream * is = new std::ifstream(*it);
+                    if ((*is) && ((*is) >> temp)) {
+                        minHeap.push(std::pair<DataType, std::ifstream *>(temp, is));
+                    } else {
+                        is->close();
+                        delete is;
+                    }
+                    ++it;
+                }
             }
             inline bool isValid() const {
                 return (minHeap.size() != 0);
