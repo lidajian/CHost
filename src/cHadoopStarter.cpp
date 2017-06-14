@@ -58,7 +58,7 @@ bool getConfFilePath(int argc, char ** argv, std::string & confFilePath, std::st
 
 void getResult(int sockfd) {
     char c;
-    if (ch::srecv(sockfd, static_cast<void *>(&c), sizeof(char)) <= 0) {
+    if (ch::precv(sockfd, static_cast<void *>(&c), sizeof(char)) <= 0) {
         L("No response from the server.\n");
     } else if (c == RES_SUCCESS) {
         L("Succeed.\n");
@@ -126,7 +126,7 @@ int main(int argc, char ** argv) {
 
     system(cpCmd.c_str());
 
-    ch::ssend(sockfd, static_cast<const void *>(&C_SERVER), sizeof(char));
+    ch::psend(sockfd, static_cast<const void *>(&C_SERVER), sizeof(char));
 
     if (!ch::sendString(sockfd, dataFilePath)) {
         L("Failed sending data file path.\n");

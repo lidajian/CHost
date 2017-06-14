@@ -6,6 +6,7 @@
 #include <vector>
 #include <string>
 #include <string.h>
+#include <stdio.h> // fopen, fread, ...
 #include "utils.hpp"
 
 namespace ch {
@@ -28,25 +29,36 @@ namespace ch {
 
     class BlockedBuffer {
         protected:
-            int _fd;
+            FILE * _fd;
             char buffer[DATA_BLOCK_SIZE + 1];
             std::mutex readLock;
             size_t bufferedLength; // byte cached in buffer
 
         public:
-            BlockedBuffer(): _fd(INVALID), bufferedLength(0) {
+            BlockedBuffer(): _fd(NULL), bufferedLength(0) {
                 buffer[DATA_BLOCK_SIZE] = '\0';
             }
 
-            inline bool isValid() {
-                return (_fd > 0);
+            ~BlockedBuffer() {
+                setFd(NULL);
             }
 
-            inline void setFd(int fd) {
+            bool open(const char * file) {
+                setFd(NULL);
+                _fd = fopen(file, "r");
+                return isValid();
+            }
+
+            inline bool isValid() {
+                return (_fd != NULL);
+            }
+
+            void setFd(FILE * fd) {
                 if (isValid()) {
-                    close(_fd);
+                    fclose(_fd);
                 }
                 _fd = fd;
+                bufferedLength = 0;
             }
 
             bool next(std::string & res) {
@@ -55,17 +67,17 @@ namespace ch {
                 if (!isValid()) {
                     return false;
                 }
-                ssize_t rv = sread(_fd, static_cast<void *>(buffer + bufferedLength), DATA_BLOCK_SIZE - bufferedLength);
+                size_t rv = fread(buffer + bufferedLength, sizeof(char), DATA_BLOCK_SIZE - bufferedLength, _fd);
                 if (rv == 0) { // EOF
-                    res.append(buffer, bufferedLength);
-                    res.push_back('\n');
-                    setFd(INVALID);
-                    bufferedLength = 0;
-                    return true;
-                } else if (rv < 0) { // error
-                    bufferedLength = 0;
-                    setFd(INVALID);
-                    return false;
+                    if (bufferedLength == 0) {
+                        setFd(NULL);
+                        return false;
+                    } else {
+                        res.append(buffer, bufferedLength);
+                        res.push_back('\n');
+                        setFd(NULL);
+                        return true;
+                    }
                 } else {
                     size_t totalLength = rv + bufferedLength;
                     size_t cursor = totalLength - 1;
@@ -81,8 +93,7 @@ namespace ch {
                         }
                     }
                     D("Line out of buffer.\n");
-                    bufferedLength = 0;
-                    setFd(INVALID);
+                    setFd(NULL);
                     return false;
                 }
             }
@@ -104,8 +115,7 @@ namespace ch {
                 fd = INVALID_SOCKET;
                 if (ch::readFileAsString(jobFilePath.c_str(), _jobFile)) {
                     D("Attempt to open data file.\n");
-                    fd = open(dataFile, O_RDONLY);
-                    buffer.setFd(fd);
+                    fd = (buffer.open(dataFile) ? ~INVALID : INVALID);
                     D("Data file opened.\n");
                 }
             }

@@ -7,12 +7,11 @@
 #include <vector>
 #include <string.h>
 #include <unistd.h>
-#include <fcntl.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <sys/stat.h>
 #include <sys/socket.h>
-#include <stdio.h> // fseeki, ftell, rewind, fread
+#include <stdio.h> // fseek, ftell, rewind, fread, ...
 #include "def.hpp"
 
 namespace ch {
@@ -47,13 +46,6 @@ namespace ch {
         } else {
             return offset;
         }
-    }
-    ssize_t sread(int fd, void * buffer, size_t size) {
-        int rv = read(fd, buffer, size);
-        if (rv < 0) {
-            D("Read failed.\n");
-        }
-        return rv;
     }
     int sconnect(int & sockfd, const char * ip, unsigned short port) {
 

@@ -98,13 +98,13 @@ bool serveServer(int sockfd) {
 
 void sendSuccess(int sockfd) {
     const char c = RES_SUCCESS;
-    ch::ssend(sockfd, static_cast<const void *>(&c), sizeof(char));
+    ch::psend(sockfd, static_cast<const void *>(&c), sizeof(char));
     close(sockfd);
 }
 
 void sendFail(int sockfd) {
     const char c = RES_FAIL;
-    ch::ssend(sockfd, static_cast<const void *>(&c), sizeof(char));
+    ch::psend(sockfd, static_cast<const void *>(&c), sizeof(char));
     close(sockfd);
 }
 
@@ -113,7 +113,7 @@ void serve(int * in_args) {
     delete in_args;
     if (sockfd > 0) { // the socket with the RPC caller
         char c;
-        int rv = ch::srecv(sockfd, static_cast<void *>(&c), sizeof(char));
+        int rv = ch::precv(sockfd, static_cast<void *>(&c), sizeof(char));
         if (rv > 0) {
             if (c == CALL_SERVER) {
                 if (!serveServer(sockfd)) {
