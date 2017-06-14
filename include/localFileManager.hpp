@@ -129,7 +129,12 @@ namespace ch {
                     fullPath.push_back((char)char_dice());
                 }
                 os.open(fullPath);
-                D(fullPath << " created.\n");
+                if (os) {
+                    D(fullPath << " created.\n");
+                } else {
+                    dumpFiles.pop_back();
+                    return getStream(os);
+                }
             }
             bool dumpToFile(std::vector<DataType *> & received) {
                 std::ofstream os;
