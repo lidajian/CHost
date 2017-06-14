@@ -126,6 +126,51 @@ namespace ch {
         in.close();
         return true;
     }
+    int getInt(std::string::iterator & it, const std::string::iterator & end) {
+        int n = 0;
+        while (it < end && (*it) <= '9' && (*it) >= '0') {
+            n = n * 10 + (int)((*it) - '0');
+            ++it;
+        }
+        return n;
+    }
+    bool isValidIP_v4(std::string & ip) {
+        std::string::iterator it = ip.begin();
+        const std::string::iterator end = ip.end();
+        // skip space
+        while (it < end && (*it) == ' ') {
+            ++it;
+        }
+        if (getInt(it, end) >= 256) { // first number
+            return false;
+        }
+        if (it >= end || (*it) != '.') {
+            return false;
+        }
+        ++it;
+        if (getInt(it, end) >= 256) { // second number
+            return false;
+        }
+        if (it >= end || (*it) != '.') {
+            return false;
+        }
+        ++it;
+        if (getInt(it, end) >= 256) { // third number
+            return false;
+        }
+        if (it >= end || (*it) != '.') {
+            return false;
+        }
+        ++it;
+        if (getInt(it, end) >= 256) { // fourth number
+            return false;
+        }
+        // skip space
+        while (it < end && (*it) == ' ') {
+            ++it;
+        }
+        return it == end;
+    }
 
     void rearrangeIPs(const std::vector<std::pair<int, std::string> > & ips, std::string & file, const int indexToHead) {
         file = std::to_string(ips[indexToHead].first) + " " + ips[indexToHead].second + "\n";

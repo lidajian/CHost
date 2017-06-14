@@ -26,8 +26,10 @@ bool createTargetConfigurationFile (std::string & confFilePath, std::string & ta
 
     std::string ip;
     int i = 0;
-    while (cis >> ip) {
-        tcis << (i++) << " " << ip << std::endl;
+    while (std::getline(cis, ip)) {
+        if (ch::isValidIP_v4(ip)) {
+            tcis << (i++) << " " << ip << std::endl;
+        }
     }
     return true;
 }

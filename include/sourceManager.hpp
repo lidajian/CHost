@@ -90,7 +90,6 @@ namespace ch {
                 // create client on clients
                 if(psend(csockfd, static_cast<const void *>(&C_CLIENT), sizeof(char)) < 0) {
                     L("Miss one client.\n");
-                    // TODO cope with this (fault tolerant)
                     close(csockfd);
                     return;
                 }
