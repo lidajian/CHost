@@ -16,25 +16,11 @@
 #include "def.hpp"
 
 namespace ch {
-    ssize_t ssend(int fd, const void * buffer, size_t len) {
-        ssize_t rv = send(fd, buffer, len, 0);
-        if (rv < 0) {
-            D("Send error: " << errno << std::endl);
-        }
-        return rv;
-    }
-    ssize_t srecv(int fd, void * buffer, size_t len) {
-        ssize_t rv = recv(fd, buffer, len, 0);
-        if (rv < 0) {
-            D("Recv error: " << errno << std::endl);
-        }
-        return rv;
-    }
     ssize_t psend(int fd, const void * buffer, size_t len) {
         off_t offset = 0;
         const char * cbuf = reinterpret_cast<const char *>(buffer);
         ssize_t sent;
-        while ((sent = send(fd, cbuf + offset, len, 0)) > 0 || (sent == -1 && errno == EINTR)) {
+        while (len != 0 && ((sent = send(fd, cbuf + offset, len, 0)) > 0 || (sent == -1 && errno == EINTR))) {
             if (sent > 0) {
                 offset += sent;
                 len -= sent;
@@ -50,7 +36,7 @@ namespace ch {
         off_t offset = 0;
         char * cbuf = reinterpret_cast<char *>(buffer);
         ssize_t received;
-        while ((received = recv(fd, cbuf + offset, len, 0)) > 0 || (received == -1 && errno == EINTR)) {
+        while (len != 0 && ((received = recv(fd, cbuf + offset, len, 0)) > 0 || (received == -1 && errno == EINTR))) {
             if (received > 0) {
                 offset += received;
                 len -= received;
@@ -66,13 +52,6 @@ namespace ch {
         int rv = read(fd, buffer, size);
         if (rv < 0) {
             D("Read failed.\n");
-        }
-        return rv;
-    }
-    ssize_t swrite(int fd, const void * buffer, size_t size) {
-        int rv = write(fd, buffer, size);
-        if (rv < 0) {
-            D("Write failed.\n");
         }
         return rv;
     }
@@ -197,7 +176,7 @@ namespace ch {
             return false;
         }
 
-        if (ssend(sockfd, static_cast<void *>(&fileSize), sizeof(ssize_t)) == sizeof(ssize_t)) {
+        if (psend(sockfd, static_cast<void *>(&fileSize), sizeof(ssize_t)) == sizeof(ssize_t)) {
             ssize_t sentSize = 0;
             ssize_t byteLeft, toSend;
             do {
@@ -210,7 +189,7 @@ namespace ch {
                         fclose(fd);
                         return false;
                     } else {
-                        rv = ssend(sockfd, static_cast<const void *>(buffer), rv);
+                        rv = psend(sockfd, static_cast<const void *>(buffer), rv);
                         if (rv < 0) {
                             D("Broken pipe.\n");
                             fclose(fd);
@@ -237,14 +216,14 @@ namespace ch {
             return false;
         }
         ssize_t fileSize = INVALID;
-        ssize_t rv = srecv(sockfd, static_cast<void *>(&fileSize), sizeof(ssize_t));
+        ssize_t rv = precv(sockfd, static_cast<void *>(&fileSize), sizeof(ssize_t));
         if (rv == sizeof(ssize_t) && fileSize >= 0) {
             ssize_t receivedSize = 0;
             ssize_t byteLeft, toReceive;
             do {
                 byteLeft = fileSize - receivedSize;
                 toReceive = MIN_VAL(byteLeft, BUFFER_SIZE);
-                rv = srecv(sockfd, static_cast<void *>(buffer), toReceive);
+                rv = precv(sockfd, static_cast<void *>(buffer), toReceive);
                 if (rv < 0) {
                     D("Broken pipe.\n");
                     fclose(fd);
@@ -279,7 +258,7 @@ namespace ch {
                 byteLeft = strSize - sentSize;
                 toSend = MIN_VAL(byteLeft, BUFFER_SIZE);
                 if (toSend > 0) {
-                    ssize_t rv = ssend(sockfd, static_cast<const void *>(strStart + sentSize), toSend);
+                    ssize_t rv = psend(sockfd, static_cast<const void *>(strStart + sentSize), toSend);
                     if (rv < 0) {
                         D("Broken pipe.\n");
                         return false;
@@ -307,7 +286,7 @@ namespace ch {
             do {
                 byteLeft = strSize - receivedSize;
                 toReceive = MIN_VAL(byteLeft, BUFFER_SIZE);
-                rv = srecv(sockfd, static_cast<void *>(buffer), toReceive);
+                rv = precv(sockfd, static_cast<void *>(buffer), toReceive);
                 if (rv < 0) {
                     D("Broken pipe.\n");
                     return false;

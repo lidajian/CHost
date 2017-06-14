@@ -52,10 +52,10 @@ namespace ch {
                 return ID_INTEGER;
             }
             bool send(int fd) {
-                return ssend(fd, static_cast<const void *>(&value), sizeof(int)) == sizeof(int);
+                return psend(fd, static_cast<const void *>(&value), sizeof(int)) == sizeof(int);
             }
             bool recv(int fd) {
-                return srecv(fd, static_cast<void *>(&value), sizeof(int)) == sizeof(int);
+                return precv(fd, static_cast<void *>(&value), sizeof(int)) == sizeof(int);
             }
             std::ifstream & read(std::ifstream & is) {
                 is.read(reinterpret_cast<char *>(&value), sizeof(int));

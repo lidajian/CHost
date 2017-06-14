@@ -148,7 +148,7 @@ namespace ch {
                 }
 
                 // create client on clients
-                if(ssend(csockfd, static_cast<const void *>(&C_CLIENT), sizeof(char)) < 0) {
+                if(psend(csockfd, static_cast<const void *>(&C_CLIENT), sizeof(char)) < 0) {
                     L("Miss one client.\n");
                     // TODO cope with this (fault tolerant)
                     close(csockfd);
@@ -168,10 +168,10 @@ namespace ch {
                 char receivedChar;
                 std::string block;
                 ssize_t endSize = INVALID;
-                while ((rv = srecv(csockfd, static_cast<void *>(&receivedChar), sizeof(char))) > 0) {
+                while ((rv = precv(csockfd, static_cast<void *>(&receivedChar), sizeof(char))) > 0) {
                     if (receivedChar == CALL_POLL) {
                         if (!(source->readBlock(block))) { // end service by server
-                            ssend(csockfd, static_cast<void *>(&endSize), sizeof(ssize_t));
+                            psend(csockfd, static_cast<void *>(&endSize), sizeof(ssize_t));
                             D("Poll reach end of line.\n");
                             break;
                         }
@@ -238,7 +238,7 @@ namespace ch {
                     return readBlock(res);
                 } else {
                     // request a block
-                    ssize_t rv = ssend(fd, static_cast<const void *>(&C_POLL), sizeof(char));
+                    ssize_t rv = psend(fd, static_cast<const void *>(&C_POLL), sizeof(char));
                     if (rv < 0) {
                         L("Broken pipe.\n");
                         return false;

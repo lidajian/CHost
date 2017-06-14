@@ -55,7 +55,6 @@ namespace ch {
                 return (minHeap.size() != 0);
             }
             bool get(T & ret) {
-                L("sorted: get called.\n");
                 if (minHeap.empty()) {
                     return false;
                 }
