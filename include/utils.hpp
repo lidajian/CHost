@@ -191,7 +191,7 @@ namespace ch {
             return false;
         }
         workingDir = homedir;
-        workingDir += "/.cHadoop";
+        workingDir += TEMP_DIR;
         std::string cmdString("mkdir -p ");
         cmdString += workingDir;
 

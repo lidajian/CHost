@@ -4,7 +4,7 @@ import pexpect
 import sys
 import re
 
-PROG_NAME = 'cHadoopServer'
+PROG_NAME = 'chserver'
 
 def read_all(handler):
     s = ''

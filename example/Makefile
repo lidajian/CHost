@@ -1,17 +1,8 @@
-INC_DIR = ../include
-JOB_CPP = wordcount.cpp
-BUILD_PREFIX = ../bin
+OBJS = wordcount
 
-CXX = g++
-CFLAGS += -D _LOG -Wall -std=c++11 -I$(INC_DIR) -D _DEBUG
-LDFLAGS += -shared -fPIC
-
-all: job
-
-job: $(JOB_CPP) $(INC_DIR)/*.hpp
-	mkdir -p $(BUILD_PREFIX)
-	$(CXX) $(CFLAGS) $(LDFLAGS) -o $(BUILD_PREFIX)/$@ $(JOB_CPP)
+all: $(OBJS)
+	for f in $^; do cd $$f && make; done
 
 .PHONY: clean
 clean:
-	rm -rf $(BUILD_PREFIX)/job
+	for f in $(OBJS); do cd $$f && make clean; done

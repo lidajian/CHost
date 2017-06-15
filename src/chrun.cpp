@@ -9,7 +9,7 @@
 const char C_SERVER = CALL_SERVER;
 
 inline void printHelp() {
-    std::cout << "Usage: cHadoopStarter\n -c [configuration file]\n -i [input data]\n -o [output file]\n -j [job file]\n";
+    std::cout << "Usage: chrun\n -c [configuration file]\n -i [input data]\n -o [output file]\n -j [job file]\n";
 }
 
 bool createTargetConfigurationFile (std::string & confFilePath, std::string & targetConfFilePath) {

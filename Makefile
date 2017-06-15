@@ -1,24 +1,19 @@
-SRC_SERVER = ./src/cHadoopServer.cpp
-SRC_STARTER = ./src/cHadoopStarter.cpp
-
 EXAMPLES_DIR = ./example
 TEST_DIR = ./test
 INC_DIR = ./include
 BUILD_PREFIX = ./bin
+SRC_DIR = ./src
 
 CXX = g++
 CFLAGS += -D _DEBUG -D _LOG -Wall -std=c++11 -I$(INC_DIR)
 LDFLAGS += -lpthread -ldl
+OBJS = chserver chrun
 
-all: cHadoopServer cHadoopStarter
+all: $(OBJS)
 
-cHadoopServer: $(SRC_SERVER) $(INC_DIR)/*.hpp
+$(OBJS) : % : $(SRC_DIR)/%.cpp $(INC_DIR)/*.hpp
 	mkdir -p $(BUILD_PREFIX)
-	$(CXX) $(CFLAGS) $(LDFLAGS) -o $(BUILD_PREFIX)/$@ $(SRC_SERVER)
-
-cHadoopStarter: $(SRC_STARTER) $(INC_DIR)/*.hpp
-	mkdir -p $(BUILD_PREFIX)
-	$(CXX) $(CFLAGS) $(LDFLAGS) -o $(BUILD_PREFIX)/$@ $(SRC_STARTER)
+	$(CXX) $(CFLAGS) $(LDFLAGS) -o $(BUILD_PREFIX)/$@ $<
 
 example: $(EXAMPLES_DIR)/*.cpp
 	cd $(EXAMPLES_DIR) && make
@@ -28,4 +23,4 @@ test: $(TEST_DIR)/*.cpp
 
 .PHONY: clean
 clean:
-	rm -rf $(BUILD_PREFIX)
+	rm -rf $(foreach OBJ, $(OBJS), $(BUILD_PREFIX)/$(OBJ))

@@ -4,8 +4,8 @@ import pexpect
 import sys
 import re
 
-cHadoop_repo_name = 'cHadoop'
-PROG_NAME = 'cHadoopServer'
+repo_name = 'CHost'
+PROG_NAME = 'chserver'
 
 def read_all(handler):
     s = ''
@@ -44,11 +44,11 @@ def restart_server(ip, pem):
                     ssh.sendline('kill -9 ' + tokens[1])
                 print 'Killed!'
 
-        ssh.sendline("mkdir .cHadoop")
-        ssh.sendline('cd ' + cHadoop_repo_name)
+        ssh.sendline("mkdir -p ." + repo_name)
+        ssh.sendline('cd ' + repo_name)
 
-        print 'Running server'
-        ssh.sendline('./bin/cHadoopServer > ~/.cHadoop/server.log &')
+        print 'Starting server'
+        ssh.sendline('./bin/' + PROG_NAME + ' > ~/.' + repo_name + '/server.log &')
 
         ssh.sendline('exit')
         r = ssh.read()
