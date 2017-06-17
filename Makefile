@@ -24,3 +24,4 @@ test: $(TEST_DIR)/*.cpp
 .PHONY: clean
 clean:
 	rm -rf $(foreach OBJ, $(OBJS), $(BUILD_PREFIX)/$(OBJ))
+	@(rmdir $(BUILD_PREFIX) 2> /dev/null; exit 0)

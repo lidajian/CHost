@@ -14,3 +14,4 @@ $(OBJ): $(JOB_CPP) $(INC_DIR)/*.hpp
 .PHONY: clean
 clean:
 	rm -rf $(BUILD_PREFIX)/$(OBJ)
+	@(rmdir $(BUILD_PREFIX) 2> /dev/null; exit 0)
