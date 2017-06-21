@@ -1,26 +1,24 @@
-#include <fcntl.h>
-#include <stdlib.h>
-#include <string>
-#include <iostream>
-#include <fstream>
-#include <ctime>
+#include <unistd.h> // getopt, getcwd
+#include <string> // string
+#include <iostream> // cout
+#include <fstream> // ifstream, ofstream
+#include <ctime> // time, difftime
 #include "utils.hpp"
-
-const char C_SERVER = CALL_SERVER;
 
 inline void printHelp() {
     std::cout << "Usage: chrun\n -c [configuration file]\n -i [input data]\n -o [output file]\n -j [job file]\n";
 }
 
-bool createTargetConfigurationFile (std::string & confFilePath, std::string & targetConfFilePath) {
-    std::ifstream cis(confFilePath.c_str());
-    std::ofstream tcis(targetConfFilePath.c_str());
+// Index IPs in configuration file
+bool createTargetConfigurationFile (const std::string & confFilePath, const std::string & targetConfFilePath) {
+    std::ifstream cis(confFilePath);
+    std::ofstream tcis(targetConfFilePath);
     if (cis.fail()) {
-        L("Cannot open configuration file.\n");
+        L("chrun: Cannot open configuration file.\n");
         return false;
     }
     if (tcis.fail()) {
-        L("Cannot open target configuration file.\n");
+        L("chrun: Cannot open target configuration file.\n");
         return false;
     }
 
@@ -34,7 +32,8 @@ bool createTargetConfigurationFile (std::string & confFilePath, std::string & ta
     return true;
 }
 
-bool getConfFilePath(int argc, char ** argv, std::string & confFilePath, std::string & dataFilePath, std::string & outputFilePath, std::string & jobFilePath) {
+// Parse arguments
+bool parseArgs(const int argc, char * const* argv, std::string & confFilePath, std::string & dataFilePath, std::string & outputFilePath, std::string & jobFilePath) {
     char c;
     bool hasC = false;
     bool hasI = false;
@@ -58,14 +57,15 @@ bool getConfFilePath(int argc, char ** argv, std::string & confFilePath, std::st
     return (hasC && hasI && hasO && hasJ);
 }
 
-void getResult(int sockfd) {
+// Get result from master
+void getResult(const int sockfd) {
     char c;
-    if (ch::precv(sockfd, static_cast<void *>(&c), sizeof(char)) <= 0) {
-        L("No response from the server.\n");
+    if (!ch::precv(sockfd, static_cast<void *>(&c), sizeof(char))) {
+        L("chrun: No response from the server.\n");
     } else if (c == RES_SUCCESS) {
-        L("Succeed.\n");
+        L("chrun: Succeed.\n");
     } else {
-        L("Fail.\n");
+        L("chrun: Fail.\n");
     }
 }
 
@@ -79,11 +79,11 @@ int main(int argc, char ** argv) {
     std::string dataFilePath;
     std::string outputFilePath;
     std::string jobFilePath;
+
     std::string targetConfFilePath;
     std::string targetJobFilePath;
-    std::string cpCmd("cp ");
 
-    if (!getConfFilePath(argc, argv, confFilePath, dataFilePath, outputFilePath, jobFilePath)) {
+    if (!parseArgs(argc, argv, confFilePath, dataFilePath, outputFilePath, jobFilePath)) {
         printHelp();
         return 0;
     }
@@ -94,20 +94,20 @@ int main(int argc, char ** argv) {
     std::string current_dir_str(current_dir);
     current_dir_str.push_back('/');
     free(current_dir);
-    if (dataFilePath[0] != '/' && dataFilePath[0] != '~') {
+    if (dataFilePath[0] != '/') {
         dataFilePath = current_dir_str + dataFilePath;
     }
-    if (outputFilePath[0] != '/' && outputFilePath[0] != '~') {
+    if (outputFilePath[0] != '/') {
         outputFilePath = current_dir_str + outputFilePath;
     }
 
     if (ch::fileExist(outputFilePath.c_str())) {
-        L("The output file exists.\n");
+        L("chrun: The output file exists.\n");
         return 0;
     }
 
-    if (ch::sconnect(sockfd, "127.0.0.1", SERVER_PORT) < 0) {
-        L("Cannot connect to server.\n");
+    if (!ch::sconnect(sockfd, "127.0.0.1", SERVER_PORT)) {
+        L("chrun: Cannot connect to server.\n");
         return 0;
     }
 
@@ -118,24 +118,27 @@ int main(int argc, char ** argv) {
     targetJobFilePath = workingDir + JOB_FILE;
 
     if (!createTargetConfigurationFile(confFilePath, targetConfFilePath)) {
-        L("Cannot create configuration file\n");
+        L("chrun: Cannot create configuration file\n");
         return 0;
     }
 
-    cpCmd += jobFilePath;
-    cpCmd.push_back(' ');
-    cpCmd += targetJobFilePath;
+    if (!ch::Copy(jobFilePath.c_str(), targetJobFilePath.c_str())) {
+        L("chrun: Cannot copy job file.\n");
+        return 0;
+    }
 
-    system(cpCmd.c_str());
-
-    ch::psend(sockfd, static_cast<const void *>(&C_SERVER), sizeof(char));
+    if (!ch::invokeMaster(sockfd)) {
+        return 0;
+    }
 
     if (!ch::sendString(sockfd, dataFilePath)) {
-        L("Failed sending data file path.\n");
+        L("chrun: Failed sending data file path.\n");
+        return 0;
     }
 
     if (!ch::sendString(sockfd, outputFilePath)) {
-        L("Failed sending output file path.\n");
+        L("chrun: Failed sending output file path.\n");
+        return 0;
     }
 
     time(&startTime);

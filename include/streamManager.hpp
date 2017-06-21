@@ -8,11 +8,13 @@
 #include <netinet/in.h> // sockaddr_in
 #include <unistd.h> // close
 #include <sys/socket.h> // accept
+#include <sys/select.h> // select
 
 #include <vector> // vector
 #include <string> // string
 #include <fstream> // ofstream
 #include <thread> // thread
+#include <chrono> // seconds
 
 #include "objectStream.hpp" // ObjectInputStream, ObjectOutputStream
 #include "dataManager.hpp" // DataManager
@@ -23,173 +25,204 @@ namespace ch {
     template <class DataType>
     class StreamManager {
         protected:
-            int self_ind;
-            int clusterSize;
+            // Id of the machine
+            size_t selfId;
+
+            // Number of machines in the cluster
+            size_t clusterSize;
+
+            // Pointer to receive threads
             std::thread ** recv_threads;
+
+            // Input streams
             std::vector<ObjectInputStream<DataType> *> istreams;
+
+            // Output streams
             std::vector<ObjectOutputStream<DataType> *> ostreams;
+
+            // Data manager
             DataManager<DataType> _data;
 
-            struct server_thread_in_t {
-                int _serverfd;
-                std::vector<std::pair<int, std::string> > & _ips;
-                std::vector<ObjectInputStream<DataType> *> & _istreams;
-
-                explicit server_thread_in_t(int serverfd, std::vector<std::pair<int, std::string> > & ips, std::vector<ObjectInputStream<DataType> *> & istreams): _serverfd(serverfd), _ips(ips), _istreams(istreams) {}
-            };
-
-            struct connect_thread_in_t {
-                std::string & _ip;
-                ObjectOutputStream<DataType> * & _stm;
-
-                explicit connect_thread_in_t(std::string & ip, ObjectOutputStream<DataType> * & stm): _ip(ip), _stm(stm) {}
-            };
-
-            struct receive_thread_in_t {
-                std::vector<ObjectInputStream<DataType> *> & _istreams;
-                int _i;
-                DataManager<DataType> & _data;
-
-                explicit receive_thread_in_t(std::vector<ObjectInputStream<DataType> *> & istreams, int i, DataManager<DataType> & data): _istreams(istreams), _i(i), _data(data) {}
-            };
-
-            static void serverThread(server_thread_in_t * in_args) {
+            // Server thread: accept connections
+            static void serverThread(int serverfd, const ipconfig_t & ips, std::vector<ObjectInputStream<DataType> *> & istreams) {
 
                 sockaddr_in remote;
                 socklen_t s_size;
 
-                int numIP = in_args->_ips.size();
+                fd_set accept_fdset;
+                struct timeval timeout;
 
-                L("Server accepting client.\n");
+                const size_t numIP = ips.size();
 
-                for (int i = 1; i < numIP; ++i) {
-                    int sockfd = accept(in_args->_serverfd, reinterpret_cast<struct sockaddr *>(&remote), &s_size);
-                    if (sockfd >= 0) {
-                        L("Accepted one.\n");
-                        ObjectInputStream<DataType> * stm = new ObjectInputStream<DataType>(sockfd);
-                        in_args->_istreams.push_back(stm);
+                L("StreamManager: Server accepting client.\n");
+
+                for (size_t i = 1; i < numIP; ++i) {
+
+                    FD_ZERO(&accept_fdset);
+                    FD_SET(serverfd, &accept_fdset);
+
+                    timeout.tv_sec = ACCEPT_TIMEOUT;
+                    timeout.tv_usec = 0;
+
+                    int rv;
+                    do {
+                        rv = select(serverfd + 1, &accept_fdset, nullptr, nullptr, &timeout);
+                    } while (rv == -1 && errno == EINTR);
+
+                    if (rv <= 0) {
+                        L("StreamManager: Server failed to accept all clients within timeout.\n");
+                        close(serverfd);
+                        return;
+                    }
+
+                    if (FD_ISSET(serverfd, &accept_fdset)) {
+                        int sockfd = accept(serverfd, reinterpret_cast<struct sockaddr *>(&remote), &s_size);
+                        if (sockfd > 0 && (getpeername(sockfd, reinterpret_cast<struct sockaddr *>(&remote), &s_size) >= 0)) {
+                            L("StreamManager: Server accepted connection from " << inet_ntoa(remote.sin_addr) << ".\n");
+                            ObjectInputStream<DataType> * stm = new ObjectInputStream<DataType>(sockfd);
+                            istreams.push_back(stm);
+                        } else {
+                            --i;
+                        }
                     } else {
                         --i;
                     }
                 }
 
-                delete in_args;
-
+                close(serverfd);
+                L("StreamManager: Server accepted all clients.\n");
             }
 
-            static void connectThread(connect_thread_in_t * in_args) {
+            // Connect thread: connect to servers
+            // sets stmr to the created object output stream if success
+            static void connectThread(const std::string & ip, ObjectOutputStream<DataType> * & stmr) {
                 ObjectOutputStream<DataType> * stm = new ObjectOutputStream<DataType>();
                 int tries = 0;
-                L("Client connecting to server.\n");
-                while (tries < MAX_CONNECTION_ATTEMPT && !(stm->open(in_args->_ip, STREAMMANAGER_PORT))) {
+                while (tries < MAX_CONNECTION_ATTEMPT && !(stm->open(ip, STREAMMANAGER_PORT))) {
                     ++tries;
+                    // wait at least CONNECTION_RETRY_INTERVAL second before another try
                     std::this_thread::yield();
+                    std::this_thread::sleep_for(std::chrono::seconds(CONNECTION_RETRY_INTERVAL));
                 }
                 if (tries == MAX_CONNECTION_ATTEMPT) {
-                    L("Client fail to connect to server.\n");
+                    L("StreamManager: Client fail to connect to " << ip << ".\n");
                     delete stm;
                 } else {
-                    L("Client connected to server.\n");
-                    in_args->_stm = stm;
-                }
-                delete in_args;
-            }
-
-            static void recvThread(receive_thread_in_t * in_args) {
-                std::vector<ObjectInputStream<DataType> *> & istreams = in_args->_istreams;
-                int i = in_args->_i;
-                ObjectInputStream<DataType> & stm = *(istreams[i]);
-                DataManager<DataType> & data = in_args->_data;
-                delete in_args;
-                DataType * got;
-                while ((got = stm.recv())) {
-                    data.store(got);
+                    L("StreamManager: Client connected to " << ip << ".\n");
+                    stmr = stm;
                 }
             }
 
+            // Receive thread: receive objects and store
+            static void recvThread(ObjectInputStream<DataType> * & stm, DataManager<DataType> & data) {
+                DataType * got = nullptr;
+                while ((got = stm->recv())) {
+                    if (!data.store(got)) {
+                        break;
+                    }
+                }
+            }
+
+            // Close and clear all streams
             void clearStreams() {
                 for (ObjectOutputStream<DataType> * stm: ostreams) {
-                    if (stm != NULL) {
+                    if (stm != nullptr) {
                         stm->close();
                         delete stm;
                     }
                 }
                 ostreams.clear();
                 for (ObjectInputStream<DataType> * stm: istreams) {
-                    if (stm != NULL) {
+                    if (stm != nullptr) {
                         stm->close();
                         delete stm;
                     }
                 }
                 istreams.clear();
             }
-            void init(std::vector<std::pair<int, std::string> > & ips){
 
-                recv_threads = NULL;
-                clusterSize = ips.size();
+            // Initialize streams
+            // 1. Accept and connect to all machines
+            // 2. Start receive threads if step 1 success
+            void init(const ipconfig_t & ips){
 
-                if (clusterSize == 0) {
-                    return;
-                }
+                selfId = ips[0].first;
 
                 int serverfd;
                 if (!prepareServer(serverfd, STREAMMANAGER_PORT)) {
+                    L("StreamManager: fail to open socket to accept clients.\n");
                     return;
                 }
 
                 istreams.clear();
                 istreams.reserve(clusterSize - 1);
                 ostreams.clear();
-                ostreams.resize(clusterSize, NULL);
-
-                self_ind = ips[0].first;
+                ostreams.resize(clusterSize, nullptr);
 
                 // create server thread to accept connection
-                server_thread_in_t * server_thread_in = new server_thread_in_t(serverfd, ips, istreams);
-                std::thread server_thread(serverThread, server_thread_in);
+                std::thread server_thread(serverThread, serverfd, std::ref(ips), std::ref(istreams));
 
                 // create connect thread to connect to server
                 std::thread ** connect_threads = new std::thread* [clusterSize];
-                for (int i = 1; i < clusterSize; ++i) {
-                    connect_thread_in_t * connect_thread_in = new connect_thread_in_t(ips[i].second, ostreams[ips[i].first]);
-                    connect_threads[i] = new std::thread(connectThread, connect_thread_in);
+                for (size_t i = 1; i < clusterSize; ++i) {
+                    connect_threads[i] = new std::thread(connectThread, std::ref(ips[i].second), std::ref(ostreams[ips[i].first]));
                 }
 
-                // wait for all connection set up
-                bool connectIsFail = false;
+                // Join server thread and connect threads
                 server_thread.join();
-                close(serverfd);
-                for (int i = 1; i < clusterSize; ++i) {
+                for (size_t i = 1; i < clusterSize; ++i) {
                     connect_threads[i]->join();
                     delete connect_threads[i];
                 }
                 delete [] connect_threads;
-                for (int i = 0; i < clusterSize; ++i) {
-                    if (i != self_ind && ostreams[i] == NULL) {
-                        connectIsFail = true;
+
+                // Check for connection failure
+                for (size_t i = 0; i < clusterSize; ++i) {
+                    if (i != selfId && ostreams[i] == nullptr) {
+                        L("StreamManager: One or more of connections are fail.\n");
+                        clearStreams();
+                        return;
                     }
                 }
-                if (connectIsFail) {
-                    L("One of connection is fail.\n");
+
+                // Check for accept failure
+                if (istreams.size() != clusterSize - 1) {
+                    L("StreamManager: Failed to accept all connections.\n");
                     clearStreams();
                     return;
                 }
 
-                L("Connection set up.\n");
+                L("StreamManager: Connection set up successfully.\n");
 
                 startRecvThreads();
             }
         public:
-            StreamManager(const char * configureFile, size_t maxDataSize, std::string & dir): _data(maxDataSize, dir){
-                std::vector<std::pair<int, std::string> > ips;
+            // Constructor: given directory of configuration
+            StreamManager(const std::string & configureFile, const std::string & dir, size_t maxDataSize = DEFAULT_MAX_DATA_SIZE): recv_threads{nullptr}, _data{dir, maxDataSize} {
+                ipconfig_t ips;
                 if (!readIPs(configureFile, ips)) {
                     return;
                 }
-                init(ips);
+                clusterSize = ips.size();
+                if (clusterSize > 0) {
+                    init(ips);
+                } else {
+                    L("StreamManager: Empty configuration.\n");
+                }
             }
-            StreamManager(std::vector<std::pair<int, std::string> > & ips, size_t maxDataSize, std::string & dir): _data(maxDataSize, dir) {
-                init(ips);
+
+            // Constructor: given vector of IP configuration
+            StreamManager(const ipconfig_t & ips, const std::string & dir, size_t maxDataSize = DEFAULT_MAX_DATA_SIZE): clusterSize{ips.size()}, recv_threads{nullptr}, _data{dir, maxDataSize} {
+                if (clusterSize > 0) {
+                    init(ips);
+                } else {
+                    L("StreamManager: Empty configuration.\n");
+                }
             }
+
+            // Destructor
+            // Send stop signal to other machines and block until receive threads end
+            // Close and clear all streams
             ~StreamManager(){
 
                 finalizeSend();
@@ -200,74 +233,96 @@ namespace ch {
 
                 clearStreams();
             }
+
+
+            // True if receive threads exists
             inline bool isReceiving(void) const {
-                return (recv_threads != NULL);
+                return (recv_threads != nullptr);
             }
+
+            // Start receive on all sockets
             void startRecvThreads(void) {
                 if (isReceiving()) {
-                    D("Already receiving.\n");
+                    D("StreamManager: Already receiving.\n");
                 } else {
-                    recv_threads = new std::thread* [clusterSize];
+                    recv_threads = new std::thread* [clusterSize - 1];
 
-                    for (int i = 1; i < clusterSize; i++) {
-                        receive_thread_in_t * receive_thread_in = new receive_thread_in_t(istreams, i - 1, _data);
-                        recv_threads[i] = new std::thread(recvThread, receive_thread_in);
+                    for (size_t i = 0; i < clusterSize - 1; i++) {
+                        recv_threads[i] = new std::thread(recvThread, std::ref(istreams[i]), std::ref(_data));
                     }
                 }
             }
+
+            // Send stop signal to other machines, cause receive thread on other machines to terminate and close connection
+            // called when we don't need these connections anymore
             void finalizeSend(void) {
                 for (ObjectOutputStream<DataType> * stm: ostreams) {
-                    if (stm != NULL) {
+                    if (stm != nullptr) {
                         stm->close();
                         delete stm;
                     }
                 }
                 ostreams.clear();
             }
+
+            // Send stop signal to other machines, cause receive thread on other machines to terminate
+            // called when we need to temporarily stop receiving (e.g. switch from map to reduce)
             void stopSend(void) {
                 for (ObjectOutputStream<DataType> * stm: ostreams) {
-                    if (stm != NULL) {
+                    if (stm != nullptr) {
                         stm->stop();
                     }
                 }
             }
+
+            // Cause the current thread to block until all receive thread end and clear resource of receive threads
             void blockTillRecvEnd(void) {
-                if (isReceiving()) {
-                    for (int i = 1; i < clusterSize; ++i) {
+                if (isReceiving() && clusterSize != 0) {
+                    for (size_t i = 0; i < clusterSize - 1; ++i) {
                         recv_threads[i]->join();
                         delete recv_threads[i];
                     }
                     delete [] recv_threads;
-                    recv_threads = NULL;
-                    L("Receive ended.\n");
+                    recv_threads = nullptr;
+                    L("StreamManager: Receive threads ended.\n");
                 }
             }
-            bool push(DataType & v, Partitioner & partitioner) {
-                int ind = partitioner.getPartition(v.hashCode(), clusterSize);
-                if (ind == self_ind) {
+
+            // Push data to the specific machine (partitioned by partitioner)
+            bool push(DataType & v, const Partitioner & partitioner) {
+                size_t id = partitioner.getPartition(v.hashCode(), clusterSize);
+                if (id == selfId) {
                     return _data.store(v);
                 } else {
-                    return ostreams[ind]->send(v);
+                    return ostreams[id]->send(v);
                 }
             }
+
+            // Get sorted stream from data manager
             SortedStream<DataType> * getSortedStream () {
                 return _data.getSortedStream();
             }
+
+            // Pour data to text file with temporary files in data manager
             bool pourToTextFile (const char * path) {
                 std::ofstream os(path);
                 if (os) {
                     UnsortedStream<DataType> * unsorted = _data.getUnsortedStream();
-                    DataType temp;
-                    while (unsorted->get(temp)) {
-                        os << temp.toString() << std::endl;
+                    if (unsorted) {
+                        DataType temp;
+                        while (unsorted->get(temp)) {
+                            os << temp.toString() << std::endl;
+                        }
+                        delete unsorted;
                     }
                     os.close();
-                    delete unsorted;
                     return true;
                 } else {
                     return false;
                 }
             }
+
+            // Set presort of data manager
             void setPresort(bool presort) {
                 _data.setPresort(presort);
             }

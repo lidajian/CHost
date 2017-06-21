@@ -1,3 +1,6 @@
+/*
+ * Definition of types
+ */
 #ifndef TYPE_HPP
 #define TYPE_HPP
 
@@ -17,18 +20,37 @@ namespace ch {
     class TypeBase {
         public:
             virtual ~TypeBase() {}
+
+            // Get id of the object
             inline static id_t getId(void) {
                 return ID_INVALID;
             }
+
+            // Get hash code of the object
             virtual int hashCode(void) = 0;
+
+            // Get string representation of the object
             virtual std::string toString() const = 0;
+
+            // Send the object through a socket
             virtual bool send(int fd) const = 0;
+
+            // Receive the object through a socket
             virtual bool recv(int fd) = 0;
+
+            // Read from file stream
             virtual std::ifstream & read(std::ifstream & is) = 0;
+
+            // write to file stream
             virtual std::ofstream & write(std::ofstream & os) const = 0;
 
+            // Output to file
             friend std::ofstream & operator << (std::ofstream & os, const TypeBase & v);
+
+            // Input from file
             friend std::ifstream & operator >> (std::ifstream & is, const TypeBase & v);
+
+            // Output to ostream
             friend std::ostream & operator << (std::ostream & os, const TypeBase & v);
     };
 
@@ -45,9 +67,20 @@ namespace ch {
     class Integer: public TypeBase {
         public:
             int value;
-            Integer(int v = 0): value(v) {}
-            Integer(const Integer & i) {value = i.value;}
+
+            // From value
+            Integer(int v = 0): value{v} {}
+
+            // Copy constructor
+            Integer(const Integer & i): value{i.value} {}
+
+            // Move constructor
+            Integer(Integer && i): value{i.value} {}
+
+            // Destructor
             ~Integer() {}
+
+            // Virtual functions implementation
             int hashCode(void) {
                 return value;
             }
@@ -58,10 +91,10 @@ namespace ch {
                 return ID_INTEGER;
             }
             bool send(int fd) const {
-                return psend(fd, static_cast<const void *>(&value), sizeof(int)) == sizeof(int);
+                return psend(fd, static_cast<const void *>(&value), sizeof(int));
             }
             bool recv(int fd) {
-                return precv(fd, static_cast<void *>(&value), sizeof(int)) == sizeof(int);
+                return precv(fd, static_cast<void *>(&value), sizeof(int));
             }
             std::ifstream & read(std::ifstream & is) {
                 is.read(reinterpret_cast<char *>(&value), sizeof(int));
@@ -71,6 +104,8 @@ namespace ch {
                 os.write(reinterpret_cast<const char *>(&value), sizeof(int));
                 return os;
             }
+
+            // Operator overriding
             bool operator == (const Integer & b) const {
                 return (value == b.value);
             }
@@ -100,18 +135,30 @@ namespace ch {
     };
 
     class String: public TypeBase {
-        private:
+        protected:
             int hash;
         public:
             std::string value;
-            String(): hash(INVALID) {}
-            String(const String & str) {
-                hash = INVALID;
-                value = str.value;
-            }
-            String(std::string & str): hash(INVALID), value(str) {}
-            String(std::string str): hash(INVALID), value(str) {}
+
+            // Default constructor
+            String(): hash{INVALID} {}
+
+            // From value
+            String(const std::string & str): hash{INVALID}, value{str} {}
+
+            // From rvalue
+            String(std::string && str): hash{INVALID}, value{std::move(str)} {}
+
+            // Copy constructor
+            String(const String & str): hash{INVALID}, value{str.value} {}
+
+            // Move constructor
+            String(String && str): hash{INVALID}, value{std::move(str.value)} {}
+
+            // Destructor
             ~String() {}
+
+            // Virtual functions implementation
             int hashCode(void) {
                 int h = hash;
                 if (h == INVALID) {
@@ -133,10 +180,12 @@ namespace ch {
                 return sendString(fd, value);
             }
             bool recv(int fd) {
+                hash = INVALID;
                 return receiveString(fd, value);
             }
             std::ifstream & read(std::ifstream & is) {
                 size_t l = 0;
+                hash = INVALID;
                 if (is.read(reinterpret_cast<char *>(&l), sizeof(size_t))) {
                     value.resize(l);
                     is.read(&value[0], l);
@@ -150,10 +199,8 @@ namespace ch {
                 }
                 return os;
             }
-            void reset(void) {
-                hash = INVALID;
-                value.clear();
-            }
+
+            // Operator overriding
             bool operator == (const String & b) const {
                 return (value.compare(b.value) == 0);
             }
@@ -173,11 +220,20 @@ namespace ch {
                 return (value.compare(b.value) >= 0);
             }
             String & operator = (const String & str) {
+                hash = INVALID;
                 value = str.value;
                 return (*this);
             }
             String & operator += (const String & str) {
+                hash = INVALID;
                 value += str.value;
+                return (*this);
+            }
+
+            // Move assignment
+            String & operator = (String && str) {
+                hash = INVALID;
+                value = std::move(str.value);
                 return (*this);
             }
     };
@@ -187,10 +243,26 @@ namespace ch {
         public:
             DataType_1 first;
             DataType_2 second;
+
+            // Default constructor
             Tuple() {}
-            Tuple(DataType_1 & v1, DataType_2 & v2): first(v1), second(v2) {}
-            Tuple(const Tuple<DataType_1, DataType_2> & t): first(t.first), second(t.second) {}
+
+            // From values
+            Tuple(const DataType_1 & v1, const DataType_2 & v2): first{v1}, second{v2} {}
+
+            // From rvalues
+            Tuple(DataType_1 && v1, DataType_2 && v2): first{std::move(v1)}, second{std::move(v2)} {}
+
+            // Copy constructor
+            Tuple(const Tuple<DataType_1, DataType_2> & t): first{t.first}, second{t.second} {}
+
+            // Move constructor
+            Tuple(Tuple<DataType_1, DataType_2> && t): first{std::move(t.first)}, second{std::move(t.second)} {}
+
+            // Destructor
             ~Tuple() {}
+
+            // Virtual functions implementation
             int hashCode(void) {
                 return first.hashCode();
             }
@@ -212,6 +284,8 @@ namespace ch {
             std::ofstream & write(std::ofstream & os) const {
                 return os << first << second;
             }
+
+            // Operator overriding
             bool operator == (const Tuple<DataType_1, DataType_2> & b) const {
                 return (first == b.first);
             }
@@ -239,7 +313,12 @@ namespace ch {
                 second += t.second;
                 return (*this);
             }
-
+            // Move assignment
+            Tuple & operator = (Tuple<DataType_1, DataType_2> && t) {
+                first = std::move(t.first);
+                second = std::move(t.second);
+                return (*this);
+            }
     };
 }
 

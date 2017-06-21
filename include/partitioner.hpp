@@ -1,3 +1,13 @@
+/*
+ * Partitioner: Guides the StreamManager where the data to send to
+ *
+ * 1. HashPartitioner
+ *     Remainder method
+ *
+ * 2. ZeroPartitioner
+ *     Return 0 anyway
+ */
+
 #ifndef PARTITIONER_H
 #define PARTITIONER_H
 
@@ -7,12 +17,13 @@ namespace ch {
 
     class Partitioner {
         public:
-            virtual int getPartition(int i, int s) = 0;
+            // Get the partition
+            virtual size_t getPartition(int i, int s) const = 0;
     };
 
     class HashPartitioner: public Partitioner {
         public:
-            int getPartition(int i, int s) {
+            size_t getPartition(int i, int s) const {
                 if (i == INT_MIN) {
                     return 0;
                 }
@@ -22,7 +33,7 @@ namespace ch {
 
     class ZeroPartitioner: public Partitioner {
         public:
-            int getPartition(int i, int s) {
+            size_t getPartition(int i, int s) const {
                 return 0;
             }
     } zeroPartitioner;

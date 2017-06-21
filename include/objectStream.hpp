@@ -14,80 +14,123 @@
 
 namespace ch {
 
+    /*
+     * Interface of object streams
+     */
     class ObjectStream {
         protected:
+            // The socket
             int _sockfd;
         public:
-            ObjectStream(): _sockfd(INVALID_SOCKET) {}
-            ObjectStream(int sockfd): _sockfd(sockfd) {}
+            // Default constructor
+            ObjectStream(): _sockfd{INVALID_SOCKET} {}
+
+            // From value
+            ObjectStream(int sockfd): _sockfd{sockfd} {}
+
+            // Virtual Destructor
             virtual ~ObjectStream() {}
+
+            // Close the connection
+            virtual void close(void) = 0;
+
+            // True if the socket is valid
             inline bool isValid(void) {
                 return _sockfd != INVALID_SOCKET;
             }
-            virtual void close(void) = 0;
     };
 
+    /*
+     * Implementation of object output stream
+     */
     template <class DataType>
     class ObjectOutputStream: public ObjectStream {
+        protected:
+            inline void sendStopSignal(void) {
+                const id_t id_invalid = ID_INVALID;
+                psend(_sockfd, static_cast<const void *>(&id_invalid), sizeof(id_t));
+            }
         public:
+            // Default constructor
             ObjectOutputStream() {}
+
+            // Destructor
             ~ObjectOutputStream() {close();}
+
+            // Connect to an given ip at given port
             bool open(const std::string & ip, unsigned short port) {
                 close();
-                return sconnect(_sockfd, ip.c_str(), port) >= 0;
+                return sconnect(_sockfd, ip.c_str(), port);
             }
+
+            // Send signal that causes ObjectInputStream::recv return nullptr
             void stop() {
                 if (isValid()) {
-                    const id_t id_invalid = ID_INVALID;
-                    psend(_sockfd, static_cast<const void *>(&id_invalid), sizeof(id_t));
+                    sendStopSignal();
                 }
             }
+
+            // Send signal that causes ObjectInputStream::recv return nullptr
+            // close the connection as well
             void close(void) {
                 if (isValid()) {
-                    const id_t id_invalid = ID_INVALID;
-                    psend(_sockfd, static_cast<const void *>(&id_invalid), sizeof(id_t));
+                    sendStopSignal();
                     ::close(_sockfd);
                     _sockfd = INVALID_SOCKET;
                 }
             }
-            bool send(DataType & v) {
-                D("Sending: " << v << std::endl);
+
+            // Send data through socket
+            bool send(const DataType & v) {
+                D("ObjectOutputStream: Sending " << v << std::endl);
                 id_t id = DataType::getId();
-                if (psend(_sockfd, static_cast<const void *>(&id), sizeof(id_t)) == sizeof(id_t)) {
+                if (psend(_sockfd, static_cast<const void *>(&id), sizeof(id_t))) {
                     return v.send(_sockfd);
+                } else {
+                    D("ObjectOutputStream: Failed sending " << v << std::endl);
                 }
                 return false;
             }
     };
 
+    /*
+     * Implementation of object input stream
+     */
     template <class DataType>
     class ObjectInputStream: public ObjectStream {
         public:
-            ObjectInputStream(int sockfd): ObjectStream(sockfd) {}
-            ~ObjectInputStream() {close();}
-            void setSocket(int sockfd) {
-                _sockfd = sockfd;
+            // From value
+            ObjectInputStream(int sockfd): ObjectStream{sockfd} {}
+
+            // Destructor
+            ~ObjectInputStream() {
+                close();
             }
+
+            // Close the connection
             void close(void) {
                 if (isValid()) {
                     ::close(_sockfd);
                     _sockfd = INVALID_SOCKET;
                 }
             }
+
+            // Receive data, return pointer to data if success
+            // return nullptr if failed
             DataType * recv(void) {
                 id_t id = ID_INVALID;
-                if (precv(_sockfd, static_cast<void *>(&id), sizeof(id_t)) == sizeof(id_t)) {
+                if (precv(_sockfd, static_cast<void *>(&id), sizeof(id_t))) {
                     if (id == DataType::getId()) {
                         DataType * v = new DataType();
                         if (!(v->recv(_sockfd))) {
                             delete v;
-                            return NULL;
+                            return nullptr;
                         }
-                        D("Received: " << (*v) << std::endl);
+                        D("ObjectInputStream: Received " << (*v) << std::endl);
                         return v;
                     }
                 }
-                return NULL;
+                return nullptr;
             }
     };
 }

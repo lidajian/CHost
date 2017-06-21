@@ -15,10 +15,10 @@ $(OBJS) : % : $(SRC_DIR)/%.cpp $(INC_DIR)/*.hpp
 	mkdir -p $(BUILD_PREFIX)
 	$(CXX) $(CFLAGS) $(LDFLAGS) -o $(BUILD_PREFIX)/$@ $<
 
-example: $(EXAMPLES_DIR)/*.cpp
+example: $(INC_DIR)/*.hpp
 	cd $(EXAMPLES_DIR) && make
 
-test: $(TEST_DIR)/*.cpp
+test: $(INC_DIR)/*.hpp $(TEST_DIR)/*.cpp
 	cd $(TEST_DIR) && make
 
 .PHONY: clean

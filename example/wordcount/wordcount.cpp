@@ -11,7 +11,6 @@ void mapFun(std::string & block, ch::StreamManager<ch::Tuple<ch::String, ch::Int
     (res.second).value = 1;
     while (ss >> ((res.first).value)) {
         sm.push(res, ch::hashPartitioner);
-        res.first.reset();
     }
 }
 
@@ -39,36 +38,46 @@ void reduceFun(ch::SortedStream<ch::Tuple<ch::String, ch::Integer> > & ss, ch::S
     }
 }
 
-extern "C" void doJob(ch::context_t & context) {
+extern "C" bool doJob(ch::context_t & context) {
     std::string polled;
 
-    ch::StreamManager<ch::Tuple<ch::String, ch::Integer> > stm(context._ips, DEFAULT_MAX_DATA_SIZE, context._workingDir);
+    ch::StreamManager<ch::Tuple<ch::String, ch::Integer> > stm(context._ips, context._workingDir, DEFAULT_MAX_DATA_SIZE);
 
-    while (context._source.poll(polled)) {
-        mapFun(polled, stm);
-    }
+    if (stm.isReceiving()) {
 
-    stm.stopSend();
-    stm.blockTillRecvEnd();
-
-    ch::SortedStream<ch::Tuple<ch::String, ch::Integer> > * sorted = stm.getSortedStream();
-
-    if (sorted) {
-
-        stm.setPresort(false);
-
-        stm.startRecvThreads();
-        reduceFun(*sorted, stm);
-
-        delete sorted;
-
-        stm.finalizeSend();
-        stm.blockTillRecvEnd();
-
-        if (context._isServer) {
-            stm.pourToTextFile(context._outputFilePath.c_str());
+        while (context._source.poll(polled)) {
+            mapFun(polled, stm);
         }
 
+        stm.stopSend();
+        stm.blockTillRecvEnd();
 
+        ch::SortedStream<ch::Tuple<ch::String, ch::Integer> > * sorted = stm.getSortedStream();
+
+        if (sorted) {
+
+            stm.setPresort(false);
+
+            stm.startRecvThreads();
+            reduceFun(*sorted, stm);
+
+            delete sorted;
+
+            stm.finalizeSend();
+            stm.blockTillRecvEnd();
+
+            if (context._isServer) {
+                return stm.pourToTextFile(context._outputFilePath.c_str());
+            }
+
+            return true;
+
+        } else {
+            L("Job: Cannot get sorted stream.\n");
+        }
+
+    } else {
+        L("Job: StreamManager failed. Nothing done.\n");
     }
+    return false;
 }

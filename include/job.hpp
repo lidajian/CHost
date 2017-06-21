@@ -8,24 +8,25 @@
 #include <string> // string
 #include <vector> // vector
 
-#include "sourceManager.hpp"
+#include "def.hpp" // ipconfig_t
+#include "sourceManager.hpp" // SourceManager
 
 namespace ch {
     struct context_t {
-        std::vector<std::pair<int, std::string> > & _ips;
+        const ipconfig_t & _ips;
         ch::SourceManager & _source;
-        std::string & _outputFilePath;
-        std::string & _workingDir;
-        bool _isServer;
+        const std::string & _outputFilePath;
+        const std::string & _workingDir;
+        const bool _isServer;
 
-        explicit context_t(std::vector<std::pair<int, std::string> > & ips,
+        explicit context_t(const ipconfig_t & ips,
                            ch::SourceManager & source,
-                           std::string & outputFilePath,
-                           std::string & workingDir,
-                           bool isServer = false): _ips(ips), _source(source), _outputFilePath(outputFilePath), _workingDir(workingDir), _isServer(isServer) {}
+                           const std::string & outputFilePath,
+                           const std::string & workingDir,
+                           const bool isServer = false): _ips(ips), _source(source), _outputFilePath(outputFilePath), _workingDir(workingDir), _isServer(isServer) {}
     };
 
-    typedef void job_f(context_t & context);
+    typedef bool job_f(context_t & context);
 }
 
 #endif

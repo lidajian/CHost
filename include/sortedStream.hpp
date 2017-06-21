@@ -14,8 +14,11 @@
 
 namespace ch {
 
+    /*
+     * pairComparator: comparator template for pair
+     */
     template <class DataType_1, class DataType_2, bool greater>
-    struct pair_comparator {
+    struct pairComparator {
         bool operator()(const std::pair<DataType_1, DataType_2> & l, const std::pair<DataType_1, DataType_2> & r) {
             if (greater) {
                 return l.first > r.first;
@@ -28,9 +31,47 @@ namespace ch {
     template <class DataType>
     class SortedStream {
         protected:
+            // Files it manages
             std::vector<std::string> _files;
-            std::priority_queue<std::pair<DataType, std::ifstream *>, std::vector<std::pair<DataType, std::ifstream *> >, pair_comparator<DataType, std::ifstream *, true> > minHeap;
+
+            // Min heap for streams
+            std::priority_queue<std::pair<DataType, std::ifstream *>, std::vector<std::pair<DataType, std::ifstream *> >, pairComparator<DataType, std::ifstream *, true> > minHeap;
         public:
+
+            // Move constructor
+            SortedStream(std::vector<std::string> && files): _files{std::move(files)} {
+                files.clear();
+                DataType temp;
+                for (const std::string & file: _files) {
+                    std::ifstream * is = new std::ifstream(file);
+                    if ((*is) && ((*is) >> temp)) {
+                        minHeap.push(std::make_pair<DataType, std::ifstream *>(std::move(temp), std::move(is)));
+                    } else {
+                        is->close();
+                        delete is;
+                    }
+                }
+            }
+
+            // Constructor with iterator
+            template <class FileIter_T>
+            SortedStream(const FileIter_T & begin, const FileIter_T & end) {
+                DataType temp;
+                FileIter_T it = begin;
+                while (it < end) {
+                    std::ifstream * is = new std::ifstream(*it);
+                    _files.push_back(std::move(*it));
+                    if ((*is) && ((*is) >> temp)) {
+                        minHeap.push(std::make_pair<DataType, std::ifstream *>(std::move(temp), std::move(is)));
+                    } else {
+                        is->close();
+                        delete is;
+                    }
+                    ++it;
+                }
+            }
+
+            // Destructor
             ~SortedStream() {
                 while (minHeap.size()) {
                     std::ifstream * is = minHeap.top().second;
@@ -39,51 +80,26 @@ namespace ch {
                     minHeap.pop();
                 }
                 for (const std::string & file: _files) {
-                    D("sorted: " << file << " deleted.\n");
                     unlink(file.c_str());
                 }
             }
-            SortedStream(std::vector<std::string> & files): _files(files) {
-                DataType temp;
-                for (const std::string & file: files) {
-                    std::ifstream * is = new std::ifstream(file);
-                    if ((*is) && ((*is) >> temp)) {
-                        minHeap.push(std::pair<DataType, std::ifstream *>(temp, is));
-                    } else {
-                        is->close();
-                        delete is;
-                    }
-                }
-            }
-            template <class Vec_Str_Iter>
-            SortedStream(const Vec_Str_Iter & begin, const Vec_Str_Iter & end) {
-                DataType temp;
-                Vec_Str_Iter it = begin;
-                while (it < end) {
-                    _files.push_back(*it);
-                    std::ifstream * is = new std::ifstream(*it);
-                    if ((*is) && ((*is) >> temp)) {
-                        minHeap.push(std::pair<DataType, std::ifstream *>(temp, is));
-                    } else {
-                        is->close();
-                        delete is;
-                    }
-                    ++it;
-                }
-            }
+
+            // True if the stream has data
             inline bool isValid() const {
                 return (minHeap.size() != 0);
             }
+
+            // Get data from stream
             bool get(DataType & ret) {
-                if (minHeap.empty()) {
+                if (!isValid()) {
                     return false;
                 }
-                std::pair<DataType, std::ifstream *> top = minHeap.top();
-                ret = top.first;
+                std::pair<DataType, std::ifstream *> top(std::move(minHeap.top()));
                 minHeap.pop();
+                ret = std::move(top.first);
                 std::ifstream * is = top.second;
                 if((*is) >> top.first) {
-                    minHeap.push(top);
+                    minHeap.push(std::move(top));
                 } else {
                     is->close();
                     delete is;
