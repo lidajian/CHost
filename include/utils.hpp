@@ -51,7 +51,7 @@ namespace ch {
 
     // fwrite with given length
     bool pfwrite(FILE * fd, const void * buffer, size_t len) {
-        off_t offset;
+        off_t offset = 0;
         const char * cbuf = reinterpret_cast<const char *>(buffer);
         size_t written;
         while (len != 0 && ((written = fwrite(cbuf + offset, sizeof(char), len, fd)) == len || (errno == EINTR))) {
@@ -64,7 +64,7 @@ namespace ch {
 
     // fread with given length
     bool pfread(FILE * fd, void * buffer, size_t len) {
-        off_t offset;
+        off_t offset = 0;
         char * cbuf = reinterpret_cast<char *>(buffer);
         size_t read_;
         while (len != 0 && ((read_ = fread(cbuf + offset, sizeof(char), len, fd)) == len || (errno == EINTR))) {
@@ -98,7 +98,9 @@ namespace ch {
     // Get file size given file discriptor
     long getFileSize(FILE * fd) {
         fseek(fd, 0, SEEK_END);
-        return ftell(fd);
+        long ret = ftell(fd);
+        rewind(fd);
+        return ret;
     }
 
     // True if the file (given by path exists)
@@ -435,7 +437,6 @@ namespace ch {
             return false;
         }
         size_t size = tempSize;
-        rewind(fd);
         str.resize(size);
         if (!pfread(fd, &str[0], size)) {
             fclose(fd);

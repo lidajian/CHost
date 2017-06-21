@@ -18,29 +18,25 @@ def deploy_on(ip, pem, git_user, git_password):
             ssh.sendline('yes')
 
         print 'Installing git'
-        ssh.sendline('sudo yum install git')
-        i = ssh.expect(['Is this ok', 'Nothing to do'], timeout = 15)
-        if i == 0:
-            ssh.sendline('y')
+        ssh.sendline('sudo yum -y install git')
 
         print 'Installing ' + CXX
-        ssh.sendline('sudo yum install ' + CXX)
-        i = ssh.expect(['Is this ok', 'Nothing to do'], timeout = 20)
-        if i == 0:
-            ssh.sendline('y')
+        ssh.sendline('sudo yum -y install ' + CXX)
 
         print 'Cloning repository'
         ssh.sendline('git clone ' + git_https)
-        i = ssh.expect(['Username', 'already exists'], timeout = 5)
+        i = ssh.expect(['Username', 'already exists'], timeout = 10)
         if i == 0:
             ssh.sendline(git_user)
-            i = ssh.expect(['Password'], timeout = 5)
+            i = ssh.expect(['Password'], timeout = 10)
             if i == 0:
                 ssh.sendline(git_password)
-                ssh.expect(['done.'], timeout = 15)
+                ssh.expect(['done.'], timeout = 20)
 
         # create temp files
         ssh.sendline('mkdir -p .' + repo_name)
+
+        # Enter repository directory
         ssh.sendline('cd ' + repo_name)
 
         print 'Compiling'
