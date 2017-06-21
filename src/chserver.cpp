@@ -10,11 +10,10 @@
 // TODO fault tolerence (error process)
 // TODO thread safe output
 std::string confFilePath;
-std::string jobFilePath;
 std::string workingDir;
 
 // Get job function from job library and run the job
-bool runJob(const ipconfig_t & ips, ch::SourceManager & source, const std::string & outputFilePath, const bool isServer) {
+bool runJob(const ipconfig_t & ips, ch::SourceManager & source, const std::string & outputFilePath, const std::string & jobFilePath, const bool isServer) {
     void * jobLib = dlopen(jobFilePath.c_str(), RTLD_LAZY);
     if (jobLib == NULL) {
         L("CHServer: Cannot find library file.\n");
@@ -43,12 +42,13 @@ bool asWorker(const int sockfd) {
     ch::SourceManagerWorker source(sockfd);
 
     if (source.isValid()) {
+        std::string jobFilePath = workingDir + JOB_FILE;
         if (source.receiveFiles(confFilePath, jobFilePath)) {
             ipconfig_t ips;
             if (ch::readIPs(confFilePath, ips)) {
                 // do job
                 const std::string outputFilePath;
-                return runJob(ips, source, outputFilePath, false);
+                return runJob(ips, source, outputFilePath, jobFilePath, false);
             }
         }
     }
@@ -61,6 +61,7 @@ bool asMaster(int sockfd) {
 
     std::string dataFilePath;
     std::string outputFilePath;
+    std::string jobFilePath;
 
     /*
      * Receive parameter from starter
@@ -69,6 +70,9 @@ bool asMaster(int sockfd) {
         return false;
     }
     if (!ch::receiveString(sockfd, outputFilePath)) {
+        return false;
+    }
+    if (!ch::receiveString(sockfd, jobFilePath)) {
         return false;
     }
 
@@ -89,7 +93,7 @@ bool asMaster(int sockfd) {
 
         // do job
 
-        bool ret = runJob(ips, source, outputFilePath, true);
+        bool ret = runJob(ips, source, outputFilePath, jobFilePath, true);
 
         source.blockTillDistributionThreadsEnd();
 
@@ -134,7 +138,6 @@ int main(int argc, char ** argv) {
     }
 
     confFilePath = workingDir + IPCONFIG_FILE;
-    jobFilePath = workingDir + JOB_FILE;
 
     int serverfd = INVALID_SOCKET;
 

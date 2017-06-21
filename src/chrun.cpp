@@ -81,7 +81,6 @@ int main(int argc, char ** argv) {
     std::string jobFilePath;
 
     std::string targetConfFilePath;
-    std::string targetJobFilePath;
 
     if (!parseArgs(argc, argv, confFilePath, dataFilePath, outputFilePath, jobFilePath)) {
         printHelp();
@@ -115,15 +114,9 @@ int main(int argc, char ** argv) {
     ch::getWorkingDirectory(workingDir);
 
     targetConfFilePath = workingDir + IPCONFIG_FILE;
-    targetJobFilePath = workingDir + JOB_FILE;
 
     if (!createTargetConfigurationFile(confFilePath, targetConfFilePath)) {
         L("chrun: Cannot create configuration file\n");
-        return 0;
-    }
-
-    if (!ch::Copy(jobFilePath.c_str(), targetJobFilePath.c_str())) {
-        L("chrun: Cannot copy job file.\n");
         return 0;
     }
 
@@ -138,6 +131,11 @@ int main(int argc, char ** argv) {
 
     if (!ch::sendString(sockfd, outputFilePath)) {
         L("chrun: Failed sending output file path.\n");
+        return 0;
+    }
+
+    if (!ch::sendString(sockfd, jobFilePath)) {
+        L("chrun: Failed sending job file path.\n");
         return 0;
     }
 
