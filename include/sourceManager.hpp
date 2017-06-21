@@ -200,7 +200,6 @@ namespace ch {
                         return false;
                     } else if (!receiveString(fd, ret)) {
                         D("SourceManagerWorker: Fail to receive the string or remote file EOF.\n");
-                        close(fd);
                         fd = INVALID_SOCKET;
                         return false;
                     } else {

@@ -70,11 +70,9 @@ extern "C" bool doJob(ch::context_t & context) {
                 return stm.pourToTextFile(context._outputFilePath.c_str());
             }
 
-            return true;
-
-        } else {
-            L("Job: Cannot get sorted stream.\n");
         }
+
+        return true;
 
     } else {
         L("Job: StreamManager failed. Nothing done.\n");

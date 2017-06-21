@@ -8,6 +8,7 @@
 #include "job.hpp"
 
 // TODO fault tolerence (error process)
+// TODO thread safe output
 std::string confFilePath;
 std::string jobFilePath;
 std::string workingDir;
@@ -42,7 +43,7 @@ bool asWorker(const int sockfd) {
     ch::SourceManagerWorker source(sockfd);
 
     if (source.isValid()) {
-        if (source.receiveFiles(jobFilePath, confFilePath)) {
+        if (source.receiveFiles(confFilePath, jobFilePath)) {
             ipconfig_t ips;
             if (ch::readIPs(confFilePath, ips)) {
                 // do job

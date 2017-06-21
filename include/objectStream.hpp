@@ -59,7 +59,8 @@ namespace ch {
 
             // Connect to an given ip at given port
             bool open(const std::string & ip, unsigned short port) {
-                close();
+                ::close(_sockfd);
+                _sockfd = INVALID_SOCKET;
                 return sconnect(_sockfd, ip.c_str(), port);
             }
 
