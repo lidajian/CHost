@@ -2,7 +2,7 @@ INC_DIR = ../include
 
 
 CXX = g++
-CFLAGS += -D _DEBUG -D _LOG -Wall -std=c++11 -I$(INC_DIR)
+CFLAGS += -D _DEBUG -D _SUGGEST -D _ERROR -Wall -std=c++11 -I$(INC_DIR)
 LDFLAGS += -lpthread
 TESTS = streamManager type
 OBJS = $(foreach TEST, $(TESTS), test_$(TEST))

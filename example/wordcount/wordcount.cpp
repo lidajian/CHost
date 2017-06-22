@@ -26,14 +26,14 @@ void reduceFun(ch::SortedStream<ch::Tuple<ch::String, ch::Integer> > & ss, ch::S
             if (res == e) {
                 res += e;
             } else {
-                D("Emit: " << res.toString() << std::endl);
+                DSS("Emit: " << res.toString() << std::endl);
                 sm.push(res, ch::zeroPartitioner);
                 res = e;
             }
         }
     }
     if (started) {
-        D("Emit: " << res.toString() << std::endl);
+        DSS("Emit: " << res.toString() << std::endl);
         sm.push(res, ch::zeroPartitioner);
     }
 }
@@ -75,7 +75,7 @@ extern "C" bool doJob(ch::context_t & context) {
         return true;
 
     } else {
-        L("Job: StreamManager failed. Nothing done.\n");
+        D("Job: StreamManager failed. Nothing done.\n");
     }
     return false;
 }

@@ -89,7 +89,8 @@ namespace ch {
                             return true;
                         }
                     }
-                    L("Splitter: Line out of buffer.\n");
+                    E("(Splitter) Line out of buffer. File is not consumed completely.\n");
+                    I("Long line is not supported for the moment.\n");
                     setFd(nullptr);
                     return false;
                 }

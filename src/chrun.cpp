@@ -5,20 +5,18 @@
 #include <ctime> // time, difftime
 #include "utils.hpp"
 
-inline void printHelp() {
-    std::cout << "Usage: chrun\n -c [configuration file]\n -i [input data]\n -o [output file]\n -j [job file]\n";
-}
-
 // Index IPs in configuration file
 bool createTargetConfigurationFile (const std::string & confFilePath, const std::string & targetConfFilePath) {
     std::ifstream cis(confFilePath);
     std::ofstream tcis(targetConfFilePath);
     if (cis.fail()) {
-        L("chrun: Cannot open configuration file.\n");
+        E("Cannot open configuration file.\n");
+        I("Check existence of the given configuration file.\n");
         return false;
     }
     if (tcis.fail()) {
-        L("chrun: Cannot open target configuration file.\n");
+        E("Cannot open target configuration file.\n");
+        I("Check if the working directory exists and there are enough space on the disk.\n");
         return false;
     }
 
@@ -39,19 +37,37 @@ bool parseArgs(const int argc, char * const* argv, std::string & confFilePath, s
     bool hasI = false;
     bool hasO = false;
     bool hasJ = false;
+
+    char * current_dir = getcwd(NULL, 0);
+    std::string current_dir_str(current_dir);
+    current_dir_str.push_back('/');
+    free(current_dir);
+
     while ((c = getopt(argc, argv, "c:i:o:j:")) != -1) {
         if (c == 'c') {
             hasC = true;
             confFilePath = optarg;
         } else if (c == 'i') {
             hasI = true;
-            dataFilePath = optarg;
+            if (optarg[0] == '/') {
+                dataFilePath = optarg;
+            } else {
+                dataFilePath = current_dir_str + optarg;
+            }
         } else if (c == 'o') {
             hasO = true;
-            outputFilePath = optarg;
+            if (optarg[0] == '/') {
+                outputFilePath = optarg;
+            } else {
+                outputFilePath = current_dir_str + optarg;
+            }
         } else if (c == 'j') {
             hasJ = true;
-            jobFilePath = optarg;
+            if (optarg[0] == '/') {
+                jobFilePath = optarg;
+            } else {
+                jobFilePath = current_dir_str + optarg;
+            }
         }
     }
     return (hasC && hasI && hasO && hasJ);
@@ -61,19 +77,17 @@ bool parseArgs(const int argc, char * const* argv, std::string & confFilePath, s
 void getResult(const int sockfd) {
     char c;
     if (!ch::precv(sockfd, static_cast<void *>(&c), sizeof(char))) {
-        L("chrun: No response from the server.\n");
+        P("No response from the server.\n");
     } else if (c == RES_SUCCESS) {
-        L("chrun: Succeed.\n");
+        P("Job Succeed.\n");
     } else {
-        L("chrun: Fail.\n");
+        P("Job Fail.\n");
     }
 }
 
 int main(int argc, char ** argv) {
 
     int sockfd;
-    time_t startTime, endTime;
-    double seconds;
 
     std::string confFilePath;
     std::string dataFilePath;
@@ -83,73 +97,75 @@ int main(int argc, char ** argv) {
     std::string targetConfFilePath;
 
     if (!parseArgs(argc, argv, confFilePath, dataFilePath, outputFilePath, jobFilePath)) {
-        printHelp();
+        P("Usage: chrun\n -c [configuration file]\n -i [input data]\n -o [output file]\n -j [job file]\n");
         return 0;
     }
 
-
-    // get full data file path if necessary
-    char * current_dir = getcwd(NULL, 0);
-    std::string current_dir_str(current_dir);
-    current_dir_str.push_back('/');
-    free(current_dir);
-    if (dataFilePath[0] != '/') {
-        dataFilePath = current_dir_str + dataFilePath;
-    }
-    if (outputFilePath[0] != '/') {
-        outputFilePath = current_dir_str + outputFilePath;
-    }
-
+    // Check existence of output file
     if (ch::fileExist(outputFilePath.c_str())) {
-        L("chrun: The output file exists.\n");
+        E("The output file exists.\n");
+        I("The output file should not exist before the job runs.\n");
         return 0;
     }
 
-    if (!ch::sconnect(sockfd, "127.0.0.1", SERVER_PORT)) {
-        L("chrun: Cannot connect to server.\n");
-        return 0;
-    }
-
+    // Create configuration file
     std::string workingDir;
     ch::getWorkingDirectory(workingDir);
 
     targetConfFilePath = workingDir + IPCONFIG_FILE;
 
     if (!createTargetConfigurationFile(confFilePath, targetConfFilePath)) {
-        L("chrun: Cannot create configuration file\n");
+        return 0;
+    }
+
+    // Connect to server and invoke master
+    if (!ch::sconnect(sockfd, LOCALHOST, SERVER_PORT)) {
+        E("Cannot connect to server.\n");
+        I("Check if the server is running properly on local machine.\n");
         return 0;
     }
 
     if (!ch::invokeMaster(sockfd)) {
+        E("Server failed to run as master.\n");
+        I("Server may be busy, try again later.\n");
+        close(sockfd);
         return 0;
     }
 
+    // Send parameters
     if (!ch::sendString(sockfd, dataFilePath)) {
-        L("chrun: Failed sending data file path.\n");
+        E("Failed sending data file path.\n");
+        I("There may be an error on server and the server may terminate unexpectedly.\n");
+        close(sockfd);
         return 0;
     }
 
     if (!ch::sendString(sockfd, outputFilePath)) {
-        L("chrun: Failed sending output file path.\n");
+        E("Failed sending output file path.\n");
+        I("There may be an error on server and the server may terminate unexpectedly.\n");
+        close(sockfd);
         return 0;
     }
 
     if (!ch::sendString(sockfd, jobFilePath)) {
-        L("chrun: Failed sending job file path.\n");
+        E("Failed sending job file path.\n");
+        I("There may be an error on server and the server may terminate unexpectedly.\n");
+        close(sockfd);
         return 0;
     }
 
+    // Timing job
+    time_t startTime, endTime;
+
     time(&startTime);
 
-    L("Started.\n");
+    P("Job started.\n");
 
     getResult(sockfd);
 
     time(&endTime);
 
-    seconds = difftime(endTime, startTime);
-
-    L("In " << seconds << " seconds.\n");
+    std::cout << "In " << difftime(endTime, startTime) << " seconds.\n";
 
     close(sockfd);
     return 0;

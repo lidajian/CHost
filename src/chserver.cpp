@@ -8,7 +8,6 @@
 #include "job.hpp"
 
 // TODO fault tolerence (error process)
-// TODO thread safe output
 std::string confFilePath;
 std::string workingDir;
 
@@ -16,12 +15,13 @@ std::string workingDir;
 bool runJob(const ipconfig_t & ips, ch::SourceManager & source, const std::string & outputFilePath, const std::string & jobFilePath, const bool isServer) {
     void * jobLib = dlopen(jobFilePath.c_str(), RTLD_LAZY);
     if (jobLib == NULL) {
-        L("CHServer: Cannot find library file.\n");
+        E("Cannot find library file.\n");
         return false;
     } else {
         const ch::job_f * doJob = (ch::job_f *)dlsym(jobLib, "doJob");
         if (doJob == NULL) {
-            L("CHServer: No doJob function found in the library.\n");
+            E("No doJob function found in the library.\n");
+            I("Please implement doJob function in the library.\n");
             return false;
         } else {
             ch::context_t context(ips, source, outputFilePath, workingDir, isServer);
@@ -37,7 +37,8 @@ bool runJob(const ipconfig_t & ips, ch::SourceManager & source, const std::strin
 
 // Run as worker
 bool asWorker(const int sockfd) {
-    L("CHServer: Running as worker.\n");
+
+    puts("Running as worker.\n");
 
     ch::SourceManagerWorker source(sockfd);
 
@@ -49,15 +50,22 @@ bool asWorker(const int sockfd) {
                 // do job
                 const std::string outputFilePath;
                 return runJob(ips, source, outputFilePath, jobFilePath, false);
+            } else {
+                E("Cannot read configuration file.\n");
             }
+        } else {
+            E("Cannot receive configuration file and job file.\n");
         }
+    } else {
+        E("Cannot connect to master.\n");
     }
     return false;
 }
 
 // Run as master
 bool asMaster(int sockfd) {
-    L("CHServer: Running as master.\n");
+
+    P("Running as master.\n");
 
     std::string dataFilePath;
     std::string outputFilePath;
@@ -67,21 +75,26 @@ bool asMaster(int sockfd) {
      * Receive parameter from starter
      */
     if (!ch::receiveString(sockfd, dataFilePath)) {
+        E("Cannot receive data file path.\n");
         return false;
     }
     if (!ch::receiveString(sockfd, outputFilePath)) {
+        E("Cannot receive output file path.\n");
         return false;
     }
     if (!ch::receiveString(sockfd, jobFilePath)) {
+        E("Cannot receive job file path.\n");
         return false;
     }
 
     ipconfig_t ips;
     if (!ch::readIPs(confFilePath, ips)) {
+        E("Cannot read configuration file.\n");
         return false;
     }
 
     if (ips.empty()) {
+        E("Configuration file contains no IP information.\n");
         return false;
     }
 
@@ -93,11 +106,21 @@ bool asMaster(int sockfd) {
 
         // do job
 
-        bool ret = runJob(ips, source, outputFilePath, jobFilePath, true);
+        if (!runJob(ips, source, outputFilePath, jobFilePath, true)) {
+            E("Job on master failed.\n");
+            return false;
+        }
 
         source.blockTillDistributionThreadsEnd();
 
-        return ret && source.allWorkerSuccess();
+        if(!source.allWorkerSuccess()) {
+            E("Job on workers failed.\n");
+            return false;
+        }
+
+        return true;
+    } else {
+        E("Fail to open data/job file.\n");
     }
 
     return false;
@@ -125,7 +148,7 @@ void serve(const int sockfd) {
                 }
                 close(sockfd);
             } else {
-                L("CHServer: Unsupported call.\n");
+                E("Unsupported call.\n");
             }
         }
     }
@@ -146,13 +169,13 @@ int main(int argc, char ** argv) {
 
     if (ch::prepareServer(serverfd, SERVER_PORT)) {
         while (1) {
-            L("CHServer: Accepting request.\n");
+            P("Accepting request.\n");
             int sockfd = accept(serverfd, reinterpret_cast<struct sockaddr *>(&remote), &s_size);
             std::thread serve_thread(serve, sockfd);
-            serve_thread.join(); // accept one request each time
         }
     } else {
-        L("CHServer: Port occupied.\n");
+        E("Port occupied.\n");
+        I("Close duplicated server.\n");
     }
 
     return 0;

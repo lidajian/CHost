@@ -33,7 +33,7 @@ namespace ch {
             std::vector<std::string> dumpFiles;
 
             // Sort data if there are no greater than MERGE_SORT_WAY files
-            void unitMergeSort(const FileIterR & begin, const FileIterR & end) {
+            bool unitMergeSort(const FileIterR & begin, const FileIterR & end) {
                 SortedStream<DataType> stm(begin, end);
                 std::ofstream os;
                 getStream(os);
@@ -41,15 +41,23 @@ namespace ch {
                     DataType temp;
                     while (stm.get(temp)) {
                         os << temp;
+                        if (!os) {
+                            E("(LocalFileManager) Cannot write to file while merge sort.\n");
+                            I("Check if there is no space.\n");
+                            return false;
+                        }
                     }
                 } else {
-                    L("LocalFileManager: Output stream failed.\n");
+                    E("(LocalFileManager) Cannot open file stream to write.\n");
+                    I("Check if there is no space.\n");
+                    return false;
                 }
+                return true;
             }
 
             // Sort data if there are less than MERGE_SORT_WAY * MERGE_SORT_WAY files
             // and greater than MERGE_SORT_WAY files
-            void gridMergeSort (const FileIterR & begin, const FileIterR & end) {
+            bool gridMergeSort (const FileIterR & begin, const FileIterR & end) {
                 const int l = end - begin - MERGE_SORT_WAY; // reserve for all slot
                 const int fullSlots = l / (MERGE_SORT_WAY - 1); // number of full merges in Step 1
                 const int remain = l % (MERGE_SORT_WAY - 1) + 1; // number of files to merge in Step 2
@@ -59,14 +67,18 @@ namespace ch {
                 // Step 1: MERGE_SORT_WAY full merge
                 for (int i = 0; i < fullSlots; i++) {
                     next_it = it + MERGE_SORT_WAY;
-                    unitMergeSort(it, next_it);
+                    if (!unitMergeSort(it, next_it)) {
+                        return false;
+                    }
                     it = next_it;
                 }
 
                 // Step 2:
                 if (remain > 0) {
                     next_it = it + remain;
-                    unitMergeSort(it, next_it);
+                    if (unitMergeSort(it, next_it)) {
+                        return false;
+                    }
                     it = next_it;
                 }
 
@@ -75,22 +87,25 @@ namespace ch {
                     dumpFiles.push_back(*it);
                     ++it;
                 }
+                return true;
             }
 
             // Sort data if there are no less than MERGE_SORT_WAY * MERGE_SORT_WAY files
-            void fullMergeSort (const FileIterR & begin, const FileIterR & end) {
+            bool fullMergeSort (const FileIterR & begin, const FileIterR & end) {
                 FileIterR it = end;
                 FileIterR next_it = end - MERGE_SORT_WAY;
                 while (next_it > begin) { // loop invariant: index increase -> size decrease
-                    unitMergeSort(next_it, it);
+                    if (!unitMergeSort(next_it, it)) {
+                        return false;
+                    }
                     it = next_it;
                     next_it = it - MERGE_SORT_WAY;
                 }
-                unitMergeSort(begin, it);
+                return unitMergeSort(begin, it);
             }
 
             // Entry that actually do merge sort
-            void doMergeSort () {
+            bool doMergeSort () {
                 size_t l = dumpFiles.size();
 
                 // full merge sort first
@@ -98,7 +113,9 @@ namespace ch {
                     std::vector<std::string> files(std::move(dumpFiles));
                     dumpFiles.clear(); // dumpFiles unspecified, clear dumpFiles
 
-                    fullMergeSort(files.rbegin(), files.rend());
+                    if (!fullMergeSort(files.rbegin(), files.rend())) {
+                        return false;
+                    }
 
                     l = dumpFiles.size();
                 }
@@ -108,10 +125,13 @@ namespace ch {
                     std::vector<std::string> files(std::move(dumpFiles));
                     dumpFiles.clear(); // dumpFiles unspecified, clear dumpFiles
 
-                    gridMergeSort(files.rbegin(), files.rend());
+                    if (!gridMergeSort(files.rbegin(), files.rend())) {
+                        return false;
+                    }
 
                     l = dumpFiles.size();
                 }
+                return true;
             }
         public:
             // Constructor
@@ -125,7 +145,6 @@ namespace ch {
             // Remove all temporary files
             void clear() {
                 for (const std::string & file: dumpFiles) {
-                    D(file << " deleted.\n");
                     unlink(file.c_str());
                 }
                 dumpFiles.clear();
@@ -145,11 +164,10 @@ namespace ch {
                     fullPath.push_back(char_dice());
                 }
                 os.open(fullPath);
-                if (os) {
-                    D("LocalFileManager: " << fullPath << " created for temporary file.\n");
-                } else {
+                if (!os) {
                     dumpFiles.pop_back();
-                    L("LocalFileManager: Fail to create temporary file, check for file system issue.\n");
+                    E("(LocalFileManager) Fail to create temporary file.\n");
+                    I("Check if there is no space.\n");
                     std::this_thread::sleep_for(std::chrono::seconds(OPEN_FILESTREAM_RETRY_INTERVAL));
                     getStream(os);
                 }
@@ -162,7 +180,8 @@ namespace ch {
                 if (os) {
                     for (size_t i = 0, l = data.size(); i < l; ++i) {
                         if (!(os << *(data[i]))) {
-                            L("LocalFileManager: Problem when writing data to file. No disk space?\n");
+                            E("(LocalFileManager) Fail to write data to file.\n");
+                            I("Check if there is no space.\n");
                             for (; i < l; ++i) {
                                 delete data[i];
                             }
@@ -173,7 +192,8 @@ namespace ch {
                         delete data[i];
                     }
                 } else {
-                    L("LocalFileManager: Problem opening file to write.\n");
+                    E("(LocalFileManager) Fail to opening file to write.\n");
+                    I("Check if there is no space.\n");
                     return false;
                 }
                 os.close();
@@ -183,7 +203,9 @@ namespace ch {
 
             // Get sorted stream with all files
             SortedStream<DataType> * getSortedStream() {
-                doMergeSort();
+                if (!doMergeSort()) {
+                    return nullptr;
+                }
                 SortedStream<DataType> * ret = new SortedStream<DataType>(std::move(dumpFiles));
                 if (ret->isValid()) {
                     return ret;

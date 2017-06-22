@@ -115,6 +115,7 @@ namespace ch {
         serverfd = socket(AF_INET, SOCK_STREAM, 0);
 
         if (serverfd < 0) {
+            D("(prepareServer) Socket failed.\n");
             return false;
         }
 
@@ -125,12 +126,14 @@ namespace ch {
         int rv = bind(serverfd, reinterpret_cast<const sockaddr *>(&addr), sizeof(sockaddr));
 
         if (rv < 0) {
+            D("(prepareServer) Bind failed.\n");
             return false;
         }
 
         rv = listen(serverfd, 5);
 
         if (rv < 0) {
+            D("(prepareServer) Listen failed.\n");
             return false;
         }
 
@@ -143,6 +146,7 @@ namespace ch {
         std::ifstream in;
         in.open(configureFile);
         if (!in) {
+            D("(readIPs) Cannot open configuration file.\n");
             return false;
         }
         std::string ip;
@@ -219,11 +223,12 @@ namespace ch {
         char buffer[BUFFER_SIZE];
         FILE * fd = fopen(file_path, "r");
         if (fd == NULL) {
-            D("sendFile: Cannot open file to write.\n");
+            D("(sendFile) Cannot open file to write.\n");
             return false;
         }
         const ssize_t fileSize = getFileSize(fd);
         if (fileSize < 0) {
+            D("(sendFile) Cannot get file size.\n");
             fclose(fd);
             return false;
         }
@@ -235,19 +240,19 @@ namespace ch {
                 byteLeft = fileSize - sentSize;
                 toSend = MIN_VAL(byteLeft, BUFFER_SIZE);
                 if (!pfread(fd, buffer, toSend)) {
-                    D("sendFile: Unexepected EOF.\n");
+                    D("(sendFile) Unexepected EOF.\n");
                     fclose(fd);
                     return false;
                 } else if (psend(sockfd, static_cast<const void *>(buffer), toSend)){
                     sentSize += toSend;
                 } else {
-                    D("sendFile: Broken pipe.\n");
+                    D("(sendFile) Broken pipe.\n");
                     fclose(fd);
                     return false;
                 }
             } while (sentSize < fileSize);
         } else {
-            D("sendFile: Cannot send file size.\n");
+            D("(sendFile) Cannot send file size.\n");
             fclose(fd);
             return false;
         }
@@ -261,7 +266,7 @@ namespace ch {
         char buffer[BUFFER_SIZE];
         FILE * srcfd = fopen(src, "r");
         if (srcfd == NULL) {
-            D("Copy: Cannot open file to read.\n");
+            D("(Copy) Cannot open file to read.\n");
             return false;
         }
         const ssize_t fileSize = getFileSize(srcfd);
@@ -271,7 +276,7 @@ namespace ch {
         }
         FILE * destfd = fopen(dest, "w");
         if (destfd == NULL) {
-            D("Copy: Cannot open file to write.\n");
+            D("(Copy) Cannot open file to write.\n");
             fclose(srcfd);
             return false;
         }
@@ -282,14 +287,14 @@ namespace ch {
             byteLeft = fileSize - copiedSize;
             toCopy = MIN_VAL(byteLeft, BUFFER_SIZE);
             if (!pfread(srcfd, buffer, toCopy)) {
-                D("Copy: Unexepected EOF.\n");
+                D("(Copy) Unexepected EOF.\n");
                 fclose(srcfd);
                 fclose(destfd);
                 return false;
             } else if (pfwrite(destfd, buffer, toCopy)){
                 copiedSize += toCopy;
             } else {
-                D("Copy: Broken pipe.\n");
+                D("(Copy) Broken pipe.\n");
                 fclose(srcfd);
                 fclose(destfd);
                 return false;
@@ -328,7 +333,7 @@ namespace ch {
         const char * homedir = getenv("HOME");
 
         if (homedir == NULL) {
-            L("$HOME environment variable not set.\n");
+            E("$HOME environment variable not set.\n");
             return false;
         }
         workingDir = homedir;
@@ -341,7 +346,7 @@ namespace ch {
         char buffer[BUFFER_SIZE];
         FILE * fd = fopen(file_path, "w");
         if (fd == NULL) {
-            D("seceiveFile: Cannot open file to write.\n");
+            D("(receiveFile) Cannot open file to write.\n");
             return false;
         }
         ssize_t fileSize;
@@ -353,19 +358,19 @@ namespace ch {
                 toReceive = MIN_VAL(byteLeft, BUFFER_SIZE);
                 if (precv(sockfd, static_cast<void *>(buffer), toReceive)) {
                     if (!pfwrite(fd, buffer, toReceive)) {
-                        D("receiveFile: Cannot write file.\n");
+                        D("(receiveFile) Cannot write file.\n");
                         fclose(fd);
                         return false;
                     }
                     receivedSize += toReceive;
                 } else {
-                    D("receiveFile: Broken pipe.\n");
+                    D("(receiveFile) Broken pipe.\n");
                     fclose(fd);
                     return false;
                 }
             } while (receivedSize < fileSize);
         } else {
-            D("receiveFile: Cannot receive file size.\n");
+            D("(receiveFile) Cannot receive file size.\n");
             fclose(fd);
             return false;
         }
@@ -385,14 +390,14 @@ namespace ch {
                 byteLeft = strSize - sentSize;
                 toSend = MIN_VAL(byteLeft, BUFFER_SIZE);
                 if (!psend(sockfd, static_cast<const void *>(strStart + sentSize), toSend)) {
-                    D("sendString: Broken pipe.\n");
+                    D("(sendString) Broken pipe.\n");
                     return false;
                 }
                 sentSize += toSend;
             } while (sentSize < strSize);
             return true;
         } else {
-            D("sendString: Cannot send string size.\n");
+            D("(sendString) Cannot send string size.\n");
             return false;
         }
     }
@@ -413,12 +418,12 @@ namespace ch {
                     str.append(buffer, toReceive);
                     receivedSize += toReceive;
                 } else {
-                    D("receiveString: Broken pipe.\n");
+                    D("(receiveString) Broken pipe.\n");
                     return false;
                 }
             } while (receivedSize < strSize);
         } else {
-            D("receiveString: Cannot receive string size.\n");
+            D("(receiveString) Cannot receive string size.\n");
             return false;
         }
         return true;
@@ -429,16 +434,19 @@ namespace ch {
         str.clear();
         FILE * fd = fopen(file_path, "r");
         if (fd == NULL) {
+            D("(readFileAsString) Cannot open file to read.\n");
             return false;
         }
         long tempSize = getFileSize(fd);
         if (tempSize < 0) {
+            D("(readFileAsString) Cannot get file size.\n");
             fclose(fd);
             return false;
         }
         size_t size = tempSize;
         str.resize(size);
         if (!pfread(fd, &str[0], size)) {
+            D("(readFileAsString) Cannot read the file.\n");
             fclose(fd);
             return false;
         }

@@ -85,7 +85,7 @@ namespace ch {
                 if (_data.size() != 0) {
                     sort(std::begin(_data), std::end(_data), pointerComp);
                     if (!fileManager.dumpToFile(_data)) {
-                        L("DataManager: Fail to dump the remaining data to file.\n");
+                        E("(DataManager) Fail to dump the remaining data to file.\n");
                         return nullptr;
                     }
                 }
@@ -97,7 +97,7 @@ namespace ch {
                 std::lock_guard<std::mutex> holder(_dataLock);
                 if (_data.size() != 0) {
                     if (!fileManager.dumpToFile(_data)) {
-                        L("DataManager: Fail to dump the remaining data to file.\n");
+                        E("(DataManager) Fail to dump the remaining data to file.\n");
                         return nullptr;
                     }
                 }

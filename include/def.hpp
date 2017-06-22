@@ -2,31 +2,64 @@
 #define DEF_H
 
 #include <iostream>
+#include <sstream>
 #include <string>
 #include <vector>
 
-// debug output
+// Debug output
 #ifndef _DEBUG
 #define D(x)
+#define DSS(x)
 #else
-#define D(x) std::cout << x
+#define D(x) perror(x)
+#define DSS(x) \
+std::ostringstream tss; \
+tss << x; \
+D(tss.str().c_str())
 #endif
 
-// log output
-#ifndef _LOG
-#define L(x)
+// Error output
+#ifndef _ERROR
+#define E(x)
+#define ESS(x)
 #else
-#define L(x) std::cout << x
+#define E(x) perror(x)
+#define ESS(x) \
+std::ostringstream tss; \
+tss << x; \
+E(tss.str().c_str())
 #endif
 
+// Informative output
+#ifndef _SUGGEST
+#define I(x)
+#define ISS(x)
+#else
+#define I(x) puts(x)
+#define ISS(x) \
+std::ostringstream tss; \
+tss << x; \
+I(tss.str().c_str())
+#endif
+
+// Puts (puts anyway)
+#define P(x) puts(x)
+#define PSS(x) \
+std::ostringstream tss; \
+tss << x; \
+P(tss.str().c_str())
+
+// Definition of object id
 #define ID_INVALID 0
 #define ID_INTEGER '\x1'
 #define ID_STRING '\x2'
 
+// RPC symbols
 #define CALL_MASTER 'M'
 #define CALL_WORKER 'W'
 #define CALL_POLL 'P'
 
+// Success/Fail symbols
 #define RES_SUCCESS 0
 #define RES_FAIL '\x1'
 
@@ -46,6 +79,7 @@
 #define TEMP_DIR "/.CHost"
 #define IPCONFIG_FILE "/ipconfig"
 #define JOB_FILE "/job"
+#define LOCALHOST "127.0.0.1"
 
 #define RANDOM_FILE_NAME_LENGTH 8
 #define DEFAULT_MAX_DATA_SIZE 1000000

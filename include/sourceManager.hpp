@@ -8,8 +8,8 @@
 #include <thread> // thread
 #include <vector> // vector
 #include <string> // string
+#include "splitter.hpp" // Splitter
 #include "utils.hpp"
-#include "splitter.hpp"
 
 namespace ch {
 
@@ -50,13 +50,13 @@ namespace ch {
 
                 // create socket to clients
                 if (!sconnect(csockfd, ip.c_str(), port)) {
-                    L("SourceManagerMaster: Cannot connect to client.\n");
+                    E("(SourceManagerMaster) Cannot connect to client.\n");
                     return;
                 }
 
                 // create client on clients
                 if(!invokeWorker(csockfd)) {
-                    L("SourceManagerMaster: Miss client " << ip << "\n");
+                    ESS("(SourceManagerMaster) Cannot invoke worker on " << ip << std::endl);
                     close(csockfd);
                     return;
                 }
@@ -80,16 +80,20 @@ namespace ch {
                             break;
                         }
                         if (!sendString(csockfd, split)) {
-                            L("SourceManagerMaster: Failed to send split.\n");
+                            E("(SourceManagerMaster) Failed to send split.\n");
                             break;
                         }
                         split.clear();
                     }
                 }
 
-                if (precv(csockfd, static_cast<void *>(&receivedChar), sizeof(char)) && receivedChar == RES_SUCCESS) {
-                    source->workerIsSuccess[i] = true;
+                if (!precv(csockfd, static_cast<void *>(&receivedChar), sizeof(char))) {
+                    E("(SourceManagerMaster) No response from worker.\n");
+                    close(csockfd);
+                    return;
                 }
+
+                source->workerIsSuccess[i] = (receivedChar == RES_SUCCESS);
 
                 close(csockfd);
             }
@@ -99,13 +103,18 @@ namespace ch {
             // Constructor
             SourceManagerMaster(const char * dataFile, const std::string & jobFilePath): _jobFilePath{jobFilePath} {
                 if (ch::readFileAsString(jobFilePath.c_str(), _jobFileContent)) {
-                    splitter.open(dataFile);
+                    if (splitter.open(dataFile)) {
+                        D("(SourceManagerMaster) Fail to open data file.\n");
+                    }
+                } else {
+                    D("(SourceManagerMaster) Fail to read job file.\n");
                 }
             }
 
             // Start distribution threads
             bool startFileDistributionThreads(int serverfd, ipconfig_t & ips, unsigned short port) {
                 if (!isValid()) {
+                    D("(SourceManagerMaster) Cannot start distribution when data file is not opened.\n");
                     return false;
                 }
                 workerIsSuccess.resize(ips.size(), false);
@@ -129,10 +138,12 @@ namespace ch {
             bool allWorkerSuccess() {
                 size_t numIPs = workerIsSuccess.size();
                 if (numIPs == 0) {
+                    D("(SourceManagerMaster) Cannot get worker results when no threads started.\n");
                     return false;
                 }
                 for (size_t i = 1; i < numIPs; ++i) {
                     if (!workerIsSuccess[i]) {
+                        DSS("(SourceManagerMaster) The " << i << "th worker failed.\n");
                         return false;
                     }
                 }
@@ -172,14 +183,15 @@ namespace ch {
             // 2. Job file
             bool receiveFiles(const std::string & confFilePath, const std::string & jobFilePath) {
                 if (!isValid()) {
+                    D("(SourceManagerWorker) The socket failed.\n");
                     return false;
                 }
                 if (!receiveFile(fd, confFilePath.c_str())) {
-                    L("SourceManagerWorker: Fail to receive configuration file.\n");
+                    E("Fail to receive configuration file.\n");
                     return false;
                 }
                 if (!receiveFile(fd, jobFilePath.c_str())) {
-                    L("SourceManagerWorker: Fail to receive job file.\n");
+                    E("Fail to receive job file.\n");
                     return false;
                 }
                 return true;
@@ -192,14 +204,16 @@ namespace ch {
             bool poll(std::string & ret) {
                 ret.clear();
                 if (!isValid()) {
+                    D("(SourceManagerWorker) The socket failed.\n");
                     return false;
                 } else {
                     // request a block
                     if (!pollRequest()) {
-                        L("SourceManagerWorker: Broken pipe.\n");
+                        D("(SourceManagerWorker) Fail to send poll request. Broken pipe.\n");
+                        fd = INVALID_SOCKET;
                         return false;
                     } else if (!receiveString(fd, ret)) {
-                        D("SourceManagerWorker: Fail to receive the string or remote file EOF.\n");
+                        D("(SourceManagerWorker) Fail to receive the string or remote file EOF.\n");
                         fd = INVALID_SOCKET;
                         return false;
                     } else {

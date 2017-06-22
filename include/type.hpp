@@ -10,6 +10,7 @@
 #include <iostream> // ostream
 #include <fstream> // ifstream, ofstream
 
+#include "def.hpp"
 #include "utils.hpp"
 
 namespace ch {

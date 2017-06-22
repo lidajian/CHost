@@ -5,7 +5,7 @@ BUILD_PREFIX = ./bin
 SRC_DIR = ./src
 
 CXX = g++
-CFLAGS += -D _DEBUG -D _LOG -Wall -std=c++11 -I$(INC_DIR)
+CFLAGS += -D _SUGGEST -D _ERROR -Wall -std=c++11 -I$(INC_DIR)
 LDFLAGS += -lpthread -ldl
 OBJS = chserver chrun
 
