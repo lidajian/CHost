@@ -102,19 +102,29 @@ int main(int argc, char ** argv) {
     }
 
     // Check existence of output file
+    if (!ch::fileExist(dataFilePath.c_str())) {
+        E("The data file does not exist.\n");
+        I("Please specify a valid data file.\n");
+        return 0;
+    }
     if (ch::fileExist(outputFilePath.c_str())) {
         E("The output file exists.\n");
         I("The output file should not exist before the job runs.\n");
+        return 0;
+    }
+    if (!ch::fileExist(jobFilePath.c_str())) {
+        E("The job file exists.\n");
+        I("Please specify a valid job file.\n");
         return 0;
     }
 
     // Create configuration file
     std::string workingDir;
     ch::getWorkingDirectory(workingDir);
-
     targetConfFilePath = workingDir + IPCONFIG_FILE;
-
     if (!createTargetConfigurationFile(confFilePath, targetConfFilePath)) {
+        E("Cannot create configuration file for server.\n");
+        I("The working directory may exist, try to clean the working directory.\n");
         return 0;
     }
 
@@ -124,7 +134,6 @@ int main(int argc, char ** argv) {
         I("Check if the server is running properly on local machine.\n");
         return 0;
     }
-
     if (!ch::invokeMaster(sockfd)) {
         E("Server failed to run as master.\n");
         I("Server may be busy, try again later.\n");
@@ -139,14 +148,12 @@ int main(int argc, char ** argv) {
         close(sockfd);
         return 0;
     }
-
     if (!ch::sendString(sockfd, outputFilePath)) {
         E("Failed sending output file path.\n");
         I("There may be an error on server and the server may terminate unexpectedly.\n");
         close(sockfd);
         return 0;
     }
-
     if (!ch::sendString(sockfd, jobFilePath)) {
         E("Failed sending job file path.\n");
         I("There may be an error on server and the server may terminate unexpectedly.\n");
