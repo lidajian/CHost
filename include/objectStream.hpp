@@ -83,12 +83,12 @@ namespace ch {
 
             // Send data through socket
             bool send(const DataType & v) {
-                DSS("ObjectOutputStream: Sending " << v << std::endl);
+                DSS("ObjectOutputStream: Sending " << v);
                 id_t id = DataType::getId();
                 if (psend(_sockfd, static_cast<const void *>(&id), sizeof(id_t))) {
                     return v.send(_sockfd);
                 } else {
-                    DSS("ObjectOutputStream: Failed sending " << v << std::endl);
+                    DSS("ObjectOutputStream: Failed sending " << v);
                 }
                 return false;
             }
@@ -127,7 +127,7 @@ namespace ch {
                             delete v;
                             return nullptr;
                         }
-                        DSS("ObjectInputStream: Received " << (*v) << std::endl);
+                        DSS("ObjectInputStream: Received " << (*v));
                         return v;
                     }
                 }

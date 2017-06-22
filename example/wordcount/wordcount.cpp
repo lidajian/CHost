@@ -26,14 +26,14 @@ void reduceFun(ch::SortedStream<ch::Tuple<ch::String, ch::Integer> > & ss, ch::S
             if (res == e) {
                 res += e;
             } else {
-                DSS("Emit: " << res.toString() << std::endl);
+                DSS("Emit: " << res.toString());
                 sm.push(res, ch::zeroPartitioner);
                 res = e;
             }
         }
     }
     if (started) {
-        DSS("Emit: " << res.toString() << std::endl);
+        DSS("Emit: " << res.toString());
         sm.push(res, ch::zeroPartitioner);
     }
 }

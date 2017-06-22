@@ -15,13 +15,13 @@ std::string workingDir;
 bool runJob(const ipconfig_t & ips, ch::SourceManager & source, const std::string & outputFilePath, const std::string & jobFilePath, const bool isServer) {
     void * jobLib = dlopen(jobFilePath.c_str(), RTLD_LAZY);
     if (jobLib == NULL) {
-        E("Cannot find library file.\n");
+        E("Cannot find library file.");
         return false;
     } else {
         const ch::job_f * doJob = (ch::job_f *)dlsym(jobLib, "doJob");
         if (doJob == NULL) {
-            E("No doJob function found in the library.\n");
-            I("Please implement doJob function in the library.\n");
+            E("No doJob function found in the library.");
+            I("Please implement doJob function in the library.");
             return false;
         } else {
             ch::context_t context(ips, source, outputFilePath, workingDir, isServer);
@@ -38,7 +38,7 @@ bool runJob(const ipconfig_t & ips, ch::SourceManager & source, const std::strin
 // Run as worker
 bool asWorker(const int sockfd) {
 
-    puts("Running as worker.\n");
+    puts("Running as worker.");
 
     ch::SourceManagerWorker source(sockfd);
 
@@ -51,13 +51,13 @@ bool asWorker(const int sockfd) {
                 const std::string outputFilePath;
                 return runJob(ips, source, outputFilePath, jobFilePath, false);
             } else {
-                E("Cannot read configuration file.\n");
+                E("Cannot read configuration file.");
             }
         } else {
-            E("Cannot receive configuration file and job file.\n");
+            E("Cannot receive configuration file and job file.");
         }
     } else {
-        E("Cannot connect to master.\n");
+        E("Cannot connect to master.");
     }
     return false;
 }
@@ -65,7 +65,7 @@ bool asWorker(const int sockfd) {
 // Run as master
 bool asMaster(int sockfd) {
 
-    P("Running as master.\n");
+    P("Running as master.");
 
     std::string dataFilePath;
     std::string outputFilePath;
@@ -75,26 +75,26 @@ bool asMaster(int sockfd) {
      * Receive parameter from starter
      */
     if (!ch::receiveString(sockfd, dataFilePath)) {
-        E("Cannot receive data file path.\n");
+        E("Cannot receive data file path.");
         return false;
     }
     if (!ch::receiveString(sockfd, outputFilePath)) {
-        E("Cannot receive output file path.\n");
+        E("Cannot receive output file path.");
         return false;
     }
     if (!ch::receiveString(sockfd, jobFilePath)) {
-        E("Cannot receive job file path.\n");
+        E("Cannot receive job file path.");
         return false;
     }
 
     ipconfig_t ips;
     if (!ch::readIPs(confFilePath, ips)) {
-        E("Cannot read configuration file.\n");
+        E("Cannot read configuration file.");
         return false;
     }
 
     if (ips.empty()) {
-        E("Configuration file contains no IP information.\n");
+        E("Configuration file contains no IP information.");
         return false;
     }
 
@@ -107,20 +107,20 @@ bool asMaster(int sockfd) {
         // do job
 
         if (!runJob(ips, source, outputFilePath, jobFilePath, true)) {
-            E("Job on master failed.\n");
+            E("Job on master failed.");
             return false;
         }
 
         source.blockTillDistributionThreadsEnd();
 
         if(!source.allWorkerSuccess()) {
-            E("Job on workers failed.\n");
+            E("Job on workers failed.");
             return false;
         }
 
         return true;
     } else {
-        E("Fail to open data/job file.\n");
+        E("Fail to open data/job file.");
     }
 
     return false;
@@ -148,7 +148,7 @@ void serve(const int sockfd) {
                 }
                 close(sockfd);
             } else {
-                E("Unsupported call.\n");
+                E("Unsupported call.");
             }
         }
     }
@@ -169,13 +169,14 @@ int main(int argc, char ** argv) {
 
     if (ch::prepareServer(serverfd, SERVER_PORT)) {
         while (1) {
-            P("Accepting request.\n");
+            P("Accepting request.");
             int sockfd = accept(serverfd, reinterpret_cast<struct sockaddr *>(&remote), &s_size);
             std::thread serve_thread(serve, sockfd);
+            serve_thread.detach();
         }
     } else {
-        E("Port occupied.\n");
-        I("Close duplicated server.\n");
+        E("Port occupied.");
+        I("Close duplicated server.");
     }
 
     return 0;

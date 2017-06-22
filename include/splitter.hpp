@@ -8,6 +8,9 @@
 #include <stdio.h> // fopen, fread, ...
 
 #include <mutex> // mutex
+#include <string.h> // memmove
+
+#include "def.hpp"
 
 namespace ch {
 

@@ -54,7 +54,7 @@ namespace ch {
 
                 const size_t numIP = ips.size();
 
-                D("(StreamManager) Server accepting client.\n");
+                D("(StreamManager) Server accepting client.");
 
                 for (size_t i = 1; i < numIP; ++i) {
 
@@ -70,7 +70,7 @@ namespace ch {
                     } while (rv == -1 && errno == EINTR);
 
                     if (rv <= 0) {
-                        D("(StreamManager) Server failed to accept all clients within timeout.\n");
+                        D("(StreamManager) Server failed to accept all clients within timeout.");
                         close(serverfd);
                         return;
                     }
@@ -78,7 +78,7 @@ namespace ch {
                     if (FD_ISSET(serverfd, &accept_fdset)) {
                         int sockfd = accept(serverfd, reinterpret_cast<struct sockaddr *>(&remote), &s_size);
                         if (sockfd > 0 && (getpeername(sockfd, reinterpret_cast<struct sockaddr *>(&remote), &s_size) >= 0)) {
-                            PSS("(StreamManager) Server accepted connection from " << inet_ntoa(remote.sin_addr) << std::endl);
+                            PSS("(StreamManager) Server accepted connection from " << inet_ntoa(remote.sin_addr));
                             ObjectInputStream<DataType> * stm = new ObjectInputStream<DataType>(sockfd);
                             istreams.push_back(stm);
                         } else {
@@ -104,10 +104,10 @@ namespace ch {
                     std::this_thread::sleep_for(std::chrono::seconds(CONNECTION_RETRY_INTERVAL));
                 }
                 if (tries == MAX_CONNECTION_ATTEMPT) {
-                    ESS("(StreamManager) Client fail to connect to " << ip << std::endl);
+                    ESS("(StreamManager) Client fail to connect to " << ip);
                     delete stm;
                 } else {
-                    PSS("StreamManager: Client connected to " << ip << std::endl);
+                    PSS("StreamManager: Client connected to " << ip);
                     stmr = stm;
                 }
             }
@@ -149,7 +149,7 @@ namespace ch {
 
                 int serverfd;
                 if (!prepareServer(serverfd, STREAMMANAGER_PORT)) {
-                    E("(StreamManager) Fail to open socket to accept clients.\n");
+                    E("(StreamManager) Fail to open socket to accept clients.");
                     return;
                 }
 
@@ -178,7 +178,7 @@ namespace ch {
                 // Check for connection failure
                 for (size_t i = 0; i < clusterSize; ++i) {
                     if (i != selfId && ostreams[i] == nullptr) {
-                        E("(StreamManager) One or more of connections are fail.\n");
+                        E("(StreamManager) One or more of connections are fail.");
                         clearStreams();
                         return;
                     }
@@ -186,12 +186,12 @@ namespace ch {
 
                 // Check for accept failure
                 if (istreams.size() != clusterSize - 1) {
-                    E("(StreamManager) Failed to accept all connections.\n");
+                    E("(StreamManager) Failed to accept all connections.");
                     clearStreams();
                     return;
                 }
 
-                P("(StreamManager) Connection set up successfully.\n");
+                P("(StreamManager) Connection set up successfully.");
 
                 startRecvThreads();
             }
@@ -206,7 +206,7 @@ namespace ch {
                 if (clusterSize > 0) {
                     init(ips);
                 } else {
-                    E("(StreamManager) Empty configuration.\n");
+                    E("(StreamManager) Empty configuration.");
                 }
             }
 
@@ -215,7 +215,7 @@ namespace ch {
                 if (clusterSize > 0) {
                     init(ips);
                 } else {
-                    E("(StreamManager) Empty configuration.\n");
+                    E("(StreamManager) Empty configuration.");
                 }
             }
 
@@ -242,7 +242,7 @@ namespace ch {
             // Start receive on all sockets
             void startRecvThreads(void) {
                 if (isReceiving()) {
-                    D("(StreamManager) Already receiving.\n");
+                    D("(StreamManager) Already receiving.");
                 } else {
                     recv_threads = new std::thread* [clusterSize - 1];
 
@@ -283,7 +283,7 @@ namespace ch {
                     }
                     delete [] recv_threads;
                     recv_threads = nullptr;
-                    D("(StreamManager) Receive threads ended.\n");
+                    D("(StreamManager) Receive threads ended.");
                 }
             }
 
@@ -312,8 +312,8 @@ namespace ch {
                         while (unsorted->get(temp)) {
                             os << temp.toString() << std::endl;
                             if (!os) {
-                                E("(StreamManager) Fail to write to text file.\n");
-                                I("Check if there is no space.\n");
+                                E("(StreamManager) Fail to write to text file.");
+                                I("Check if there is no space.");
                                 delete unsorted;
                                 os.close();
                                 return false;
@@ -324,8 +324,8 @@ namespace ch {
                     os.close();
                     return true;
                 } else {
-                    E("(StreamManager) Fail to open file to write.\n");
-                    I("Check if there is no space.\n");
+                    E("(StreamManager) Fail to open file to write.");
+                    I("Check if there is no space.");
                     return false;
                 }
             }

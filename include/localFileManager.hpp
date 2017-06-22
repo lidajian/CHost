@@ -42,14 +42,14 @@ namespace ch {
                     while (stm.get(temp)) {
                         os << temp;
                         if (!os) {
-                            E("(LocalFileManager) Cannot write to file while merge sort.\n");
-                            I("Check if there is no space.\n");
+                            E("(LocalFileManager) Cannot write to file while merge sort.");
+                            I("Check if there is no space.");
                             return false;
                         }
                     }
                 } else {
-                    E("(LocalFileManager) Cannot open file stream to write.\n");
-                    I("Check if there is no space.\n");
+                    E("(LocalFileManager) Cannot open file stream to write.");
+                    I("Check if there is no space.");
                     return false;
                 }
                 return true;
@@ -166,8 +166,8 @@ namespace ch {
                 os.open(fullPath);
                 if (!os) {
                     dumpFiles.pop_back();
-                    E("(LocalFileManager) Fail to create temporary file.\n");
-                    I("Check if there is no space.\n");
+                    E("(LocalFileManager) Fail to create temporary file.");
+                    I("Check if there is no space.");
                     std::this_thread::sleep_for(std::chrono::seconds(OPEN_FILESTREAM_RETRY_INTERVAL));
                     getStream(os);
                 }
@@ -180,8 +180,8 @@ namespace ch {
                 if (os) {
                     for (size_t i = 0, l = data.size(); i < l; ++i) {
                         if (!(os << *(data[i]))) {
-                            E("(LocalFileManager) Fail to write data to file.\n");
-                            I("Check if there is no space.\n");
+                            E("(LocalFileManager) Fail to write data to file.");
+                            I("Check if there is no space.");
                             for (; i < l; ++i) {
                                 delete data[i];
                             }
@@ -192,8 +192,8 @@ namespace ch {
                         delete data[i];
                     }
                 } else {
-                    E("(LocalFileManager) Fail to opening file to write.\n");
-                    I("Check if there is no space.\n");
+                    E("(LocalFileManager) Fail to opening file to write.");
+                    I("Check if there is no space.");
                     return false;
                 }
                 os.close();
