@@ -1,6 +1,5 @@
 INC_DIR = ../include
 
-
 CXX = g++
 CFLAGS += -D _DEBUG -D _SUGGEST -D _ERROR -Wall -std=c++11 -I$(INC_DIR)
 LDFLAGS += -lpthread

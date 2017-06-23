@@ -197,7 +197,7 @@ namespace ch {
             }
         public:
             // Constructor: given directory of configuration
-            StreamManager(const std::string & configureFile, const std::string & dir, size_t maxDataSize = DEFAULT_MAX_DATA_SIZE): recv_threads{nullptr}, _data{dir, maxDataSize} {
+            StreamManager(const std::string & configureFile, const std::string & dir, size_t maxDataSize = DEFAULT_MAX_DATA_SIZE, bool presort = true): recv_threads{nullptr}, _data{dir, maxDataSize, presort} {
                 ipconfig_t ips;
                 if (!readIPs(configureFile, ips)) {
                     return;
@@ -211,7 +211,7 @@ namespace ch {
             }
 
             // Constructor: given vector of IP configuration
-            StreamManager(const ipconfig_t & ips, const std::string & dir, size_t maxDataSize = DEFAULT_MAX_DATA_SIZE): clusterSize{ips.size()}, recv_threads{nullptr}, _data{dir, maxDataSize} {
+            StreamManager(const ipconfig_t & ips, const std::string & dir, size_t maxDataSize = DEFAULT_MAX_DATA_SIZE, bool presort = true): clusterSize{ips.size()}, recv_threads{nullptr}, _data{dir, maxDataSize, presort} {
                 if (clusterSize > 0) {
                     init(ips);
                 } else {

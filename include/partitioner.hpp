@@ -1,11 +1,6 @@
 /*
  * Partitioner: Guides the StreamManager where the data to send to
  *
- * 1. HashPartitioner
- *     Remainder method
- *
- * 2. ZeroPartitioner
- *     Return 0 anyway
  */
 
 #ifndef PARTITIONER_H
@@ -21,6 +16,9 @@ namespace ch {
             virtual size_t getPartition(int i, int s) const = 0;
     };
 
+    /*
+     * HashPartitioner: Remainder method
+     */
     class HashPartitioner: public Partitioner {
         public:
             size_t getPartition(int i, int s) const {
@@ -31,6 +29,9 @@ namespace ch {
             }
     } hashPartitioner;
 
+    /*
+     * ZeroPartitioner: Map to master anyway
+     */
     class ZeroPartitioner: public Partitioner {
         public:
             size_t getPartition(int i, int s) const {

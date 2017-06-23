@@ -4,7 +4,7 @@ BUILD_PREFIX = ../../bin
 OBJ = wordcount
 
 CXX = g++
-CFLAGS += -D _SUGGEST -D _LOG -Wall -std=c++11 -I$(INC_DIR)# -D _DEBUG
+CFLAGS += -D _SUGGEST -D _ERROR -Wall -std=c++11 -I$(INC_DIR)# -D _DEBUG
 LDFLAGS += -shared -fPIC
 
 $(OBJ): $(JOB_CPP) $(INC_DIR)/*.hpp

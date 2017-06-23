@@ -344,6 +344,10 @@ namespace ch {
     // Receive file from socket
     bool receiveFile(const int sockfd, const char * file_path) {
         char buffer[BUFFER_SIZE];
+        if (fileExist(file_path)) {
+            E("(receiveFile) File exists.");
+            return false;
+        }
         FILE * fd = fopen(file_path, "w");
         if (fd == NULL) {
             D("(receiveFile) Cannot open file to write.");

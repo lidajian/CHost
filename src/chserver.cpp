@@ -1,13 +1,16 @@
-#include <thread>
-#include <fcntl.h>
-#include <unistd.h>
-#include <vector>
-#include <string>
-#include <dlfcn.h>
+#include <sys/socket.h> // accept
+#include <dlfcn.h> // dlopen, dlsym, dlclose
+#include <unistd.h> // unlink, close
+
+#include <string> // string
+#include <thread> // thread
+
+#include "utils.hpp"
 #include "sourceManager.hpp"
 #include "job.hpp"
 
 // TODO fault tolerence (error process)
+// TODO multi-thread
 std::string confFilePath;
 std::string workingDir;
 
@@ -48,12 +51,16 @@ bool asWorker(const int sockfd) {
             ipconfig_t ips;
             if (ch::readIPs(confFilePath, ips)) {
                 // do job
+                unlink(confFilePath.c_str());
                 const std::string outputFilePath;
                 return runJob(ips, source, outputFilePath, jobFilePath, false);
             } else {
+                unlink(confFilePath.c_str());
                 E("Cannot read configuration file.");
             }
+            unlink(jobFilePath.c_str());
         } else {
+            unlink(jobFilePath.c_str());
             E("Cannot receive configuration file and job file.");
         }
     } else {
@@ -90,8 +97,10 @@ bool asMaster(int sockfd) {
     ipconfig_t ips;
     if (!ch::readIPs(confFilePath, ips)) {
         E("Cannot read configuration file.");
+        unlink(confFilePath.c_str());
         return false;
     }
+    unlink(confFilePath.c_str());
 
     if (ips.empty()) {
         E("Configuration file contains no IP information.");
