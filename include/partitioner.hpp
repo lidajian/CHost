@@ -7,6 +7,7 @@
 #define PARTITIONER_H
 
 #include <climits> // INT_MIN
+#include <cstddef> // size_t
 
 namespace ch {
 

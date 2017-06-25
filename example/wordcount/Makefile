@@ -1,15 +1,23 @@
 INC_DIR = ../../include
-JOB_CPP = wordcount.cpp
 BUILD_PREFIX = ../../bin
-OBJ = wordcount
+TEMP_PREFIX = ../../tmp
 
 CXX = g++
 CFLAGS += -D _SUGGEST -D _ERROR -Wall -std=c++11 -I$(INC_DIR)# -D _DEBUG
 LDFLAGS += -shared -fPIC
+OBJS = sourceManager utils splitter
+OBJS_PATHS = $(foreach OBJ, $(OBJS), $(TEMP_PREFIX)/$(OBJ).o)
+EXECS = wordcount
+EXECS_PATHS = $(foreach EXEC, $(EXECS), $(BUILD_PREFIX)/$(EXEC))
 
-$(OBJ): $(JOB_CPP) $(INC_DIR)/*.hpp
+all: build $(EXECS)
+
+$(EXECS): % : %.cpp $(OBJS_PATHS)
+	$(CXX) $(CFLAGS) $(LDFLAGS) -o $(BUILD_PREFIX)/$@ $^
+
+.PHONY: build
+build:
 	mkdir -p $(BUILD_PREFIX)
-	$(CXX) $(CFLAGS) $(LDFLAGS) -o $(BUILD_PREFIX)/$@ $(JOB_CPP)
 
 .PHONY: clean
 clean:

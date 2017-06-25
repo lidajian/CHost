@@ -13,6 +13,10 @@
 
 namespace ch {
 
+    /********************************************
+     ************** Declaration *****************
+    ********************************************/
+
     template <class DataType>
     class UnsortedStream {
         protected:
@@ -27,41 +31,61 @@ namespace ch {
         public:
 
             // Move constructor
-            UnsortedStream(std::vector<std::string> && files): _files(std::move(files)) {
-                i = 0;
-                while (!isValid() && i < _files.size()) {
-                    is.close();
-                    is.open(_files[i++]);
-                }
-                files.clear();
-            }
+            UnsortedStream(std::vector<std::string> && files);
 
             // Destructor
-            ~UnsortedStream() {
-                for (const std::string & file: _files) {
-                    unlink(file.c_str());
-                }
-            }
+            ~UnsortedStream();
 
             // True if stream is good
-            inline bool isValid() {
-                return bool(is);
-            }
+            bool isValid();
 
             // Get data from stream
-            bool get(DataType & ret) {
-
-                while (!(isValid() && (is >> ret))) {
-                    is.close();
-                    if (i < _files.size()) {
-                        is.open(_files[i++]);
-                    } else {
-                        return false;
-                    }
-                }
-                return true;
-            }
+            bool get(DataType & ret);
     };
+
+    /********************************************
+     ************ Implementation ****************
+    ********************************************/
+
+    // Move constructor
+    template <class DataType>
+    UnsortedStream<DataType>::UnsortedStream(std::vector<std::string> && files): _files(std::move(files)) {
+        i = 0;
+        while (!isValid() && i < _files.size()) {
+            is.close();
+            is.open(_files[i++]);
+        }
+        files.clear();
+    }
+
+    // Destructor
+    template <class DataType>
+    UnsortedStream<DataType>::~UnsortedStream() {
+        for (const std::string & file: _files) {
+            unlink(file.c_str());
+        }
+    }
+
+    // True if stream is good
+    template <class DataType>
+    inline bool UnsortedStream<DataType>::isValid() {
+        return bool(is);
+    }
+
+    // Get data from stream
+    template <class DataType>
+    bool UnsortedStream<DataType>::get(DataType & ret) {
+
+        while (!(isValid() && (is >> ret))) {
+            is.close();
+            if (i < _files.size()) {
+                is.open(_files[i++]);
+            } else {
+                return false;
+            }
+        }
+        return true;
+    }
 
 }
 
