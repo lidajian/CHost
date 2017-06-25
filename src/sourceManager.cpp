@@ -124,6 +124,17 @@ namespace ch {
         return psend(fd, static_cast<const void *>(&c), sizeof(char));
     }
 
+    // Constructor for worker
+    SourceManagerWorker::SourceManagerWorker(int sockfd): fd{sockfd} {}
+
+    // Copy Constructor
+    SourceManagerWorker::SourceManagerWorker(const SourceManagerWorker & o): fd{o.fd} {}
+
+    // Move Constructor
+    SourceManagerWorker::SourceManagerWorker(SourceManagerWorker && o): fd{o.fd} {
+        o.fd = INVALID_SOCKET;
+    }
+
     bool SourceManagerWorker::receiveFiles(const std::string & confFilePath, const std::string & jobFilePath) {
         if (!isValid()) {
             D("(SourceManagerWorker) The socket failed.");

@@ -46,6 +46,12 @@ namespace ch {
             // Constructor
             explicit DataManager (const std::string & dir, size_t maxDataSize = DEFAULT_MAX_DATA_SIZE, bool presort = true);
 
+            // Copy constructor (deleted)
+            DataManager(const DataManager<DataType> & ) = delete;
+
+            // Move constructor (deleted)
+            DataManager(DataManager<DataType> && ) = delete;
+
             // Destructor
             ~DataManager();
 

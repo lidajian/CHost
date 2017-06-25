@@ -35,8 +35,8 @@ namespace ch {
             // Number of machines in the cluster
             size_t clusterSize;
 
-            // Pointer to receive threads
-            std::thread ** recv_threads;
+            // Receive threads
+            std::vector<std::thread> receiveThreads;
 
             // Input streams
             std::vector<ObjectInputStream<DataType> *> istreams;
@@ -75,7 +75,6 @@ namespace ch {
             // Send stop signal to other machines and block until receive threads end
             // Close and clear all streams
             ~StreamManager();
-
 
             // True if receive threads exists
             bool isReceiving(void) const;
@@ -177,7 +176,7 @@ namespace ch {
             ESS("(StreamManager) Client fail to connect to " << ip);
             delete stm;
         } else {
-            PSS("StreamManager: Client connected to " << ip);
+            PSS("(StreamManager) Client connected to " << ip);
             stmr = stm;
         }
     }
@@ -235,18 +234,16 @@ namespace ch {
         std::thread server_thread(serverThread, serverfd, std::ref(ips), std::ref(istreams));
 
         // create connect thread to connect to server
-        std::thread ** connect_threads = new std::thread* [clusterSize];
+        std::vector<std::thread> connectThreads;
         for (size_t i = 1; i < clusterSize; ++i) {
-            connect_threads[i] = new std::thread(connectThread, std::ref(ips[i].second), std::ref(ostreams[ips[i].first]));
+            connectThreads.emplace_back(std::thread(connectThread, std::ref(ips[i].second), std::ref(ostreams[ips[i].first])));
         }
 
         // Join server thread and connect threads
         server_thread.join();
-        for (size_t i = 1; i < clusterSize; ++i) {
-            connect_threads[i]->join();
-            delete connect_threads[i];
+        for (std::thread & thrd: connectThreads) {
+            thrd.join();
         }
-        delete [] connect_threads;
 
         // Check for connection failure
         for (size_t i = 0; i < clusterSize; ++i) {
@@ -271,7 +268,7 @@ namespace ch {
 
     // Constructor: given directory of configuration
     template <class DataType>
-    StreamManager<DataType>::StreamManager(const std::string & configureFile, const std::string & dir, size_t maxDataSize, bool presort): recv_threads{nullptr}, _data{dir, maxDataSize, presort} {
+    StreamManager<DataType>::StreamManager(const std::string & configureFile, const std::string & dir, size_t maxDataSize, bool presort): _data{dir, maxDataSize, presort} {
         ipconfig_t ips;
         if (!readIPs(configureFile, ips)) {
             return;
@@ -286,7 +283,7 @@ namespace ch {
 
     // Constructor: given vector of IP configuration
     template <class DataType>
-    StreamManager<DataType>::StreamManager(const ipconfig_t & ips, const std::string & dir, size_t maxDataSize, bool presort): clusterSize{ips.size()}, recv_threads{nullptr}, _data{dir, maxDataSize, presort} {
+    StreamManager<DataType>::StreamManager(const ipconfig_t & ips, const std::string & dir, size_t maxDataSize, bool presort): clusterSize{ips.size()}, _data{dir, maxDataSize, presort} {
         if (clusterSize > 0) {
             init(ips);
         } else {
@@ -313,7 +310,7 @@ namespace ch {
     // True if receive threads exists
     template <class DataType>
     inline bool StreamManager<DataType>::isReceiving(void) const {
-        return (recv_threads != nullptr);
+        return (receiveThreads.size() > 0);
     }
 
     // Start receive on all sockets
@@ -322,10 +319,9 @@ namespace ch {
         if (isReceiving()) {
             D("(StreamManager) Already receiving.");
         } else {
-            recv_threads = new std::thread* [clusterSize - 1];
 
             for (size_t i = 0; i < clusterSize - 1; i++) {
-                recv_threads[i] = new std::thread(recvThread, std::ref(istreams[i]), std::ref(_data));
+                receiveThreads.emplace_back(std::thread(recvThread, std::ref(istreams[i]), std::ref(_data)));
             }
         }
     }
@@ -357,13 +353,11 @@ namespace ch {
     // Cause the current thread to block until all receive thread end and clear resource of receive threads
     template <class DataType>
     void StreamManager<DataType>::blockTillRecvEnd(void) {
-        if (isReceiving() && clusterSize != 0) {
-            for (size_t i = 0; i < clusterSize - 1; ++i) {
-                recv_threads[i]->join();
-                delete recv_threads[i];
+        if (isReceiving()) {
+            for (std::thread & thrd: receiveThreads) {
+                thrd.join();
             }
-            delete [] recv_threads;
-            recv_threads = nullptr;
+            receiveThreads.clear();
             D("(StreamManager) Receive threads ended.");
         }
     }

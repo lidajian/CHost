@@ -42,12 +42,18 @@ namespace ch {
             std::priority_queue<std::pair<DataType, std::ifstream *>, std::vector<std::pair<DataType, std::ifstream *> >, pairComparator<DataType, std::ifstream *, true> > minHeap;
         public:
 
-            // Move constructor
+            // Constructor
             SortedStream(std::vector<std::string> && files);
 
             // Constructor with iterator
             template <class FileIter_T>
             SortedStream(const FileIter_T & begin, const FileIter_T & end);
+
+            // Copy constructor (deleted)
+            SortedStream(const SortedStream<DataType> & ) = delete;
+
+            // Move constructor
+            SortedStream(SortedStream<DataType> && o);
 
             // Destructor
             ~SortedStream();
@@ -63,7 +69,7 @@ namespace ch {
      ************ Implementation ****************
     ********************************************/
 
-    // Move constructor
+    // Constructor
     template <class DataType>
     SortedStream<DataType>::SortedStream(std::vector<std::string> && files): _files{std::move(files)} {
         files.clear();
@@ -96,6 +102,13 @@ namespace ch {
             }
             ++it;
         }
+    }
+
+    // Move constructor
+    template <class DataType>
+    SortedStream<DataType>::SortedStream(SortedStream<DataType> && o): _files{std::move(o._files)} {
+        o._files.clear();
+        o.minHeap.swap(minHeap);
     }
 
     // Destructor

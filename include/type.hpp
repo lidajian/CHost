@@ -133,6 +133,12 @@ namespace ch {
                 value += i.value;
                 return (*this);
             }
+
+            // Move assignment
+            Integer & operator = (Integer && i) {
+                value = std::move(i.value);
+                return (*this);
+            }
     };
 
     class String: public TypeBase {

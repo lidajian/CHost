@@ -53,6 +53,12 @@ namespace ch {
             // Constructor
             SourceManagerMaster(const char * dataFile, const std::string & jobFilePath);
 
+            // Copy constructor (deleted)
+            SourceManagerMaster(const SourceManagerMaster &) = delete;
+
+            // Move constructor (deleted)
+            SourceManagerMaster(SourceManagerMaster &&) = delete;
+
             // Start distribution threads
             void startFileDistributionThreads(int serverfd, const ipconfig_t & ips, unsigned short port);
 
@@ -80,7 +86,13 @@ namespace ch {
         public:
 
             // Constructor for worker
-            SourceManagerWorker(int sockfd): fd{sockfd} {}
+            SourceManagerWorker(int sockfd);
+
+            // Copy Constructor
+            SourceManagerWorker(const SourceManagerWorker & o);
+
+            // Move Constructor
+            SourceManagerWorker(SourceManagerWorker && o);
 
             // Receive resource files
             // 1. Configuration file

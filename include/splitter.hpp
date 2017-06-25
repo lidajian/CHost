@@ -32,6 +32,12 @@ namespace ch {
             // Default constructor
             Splitter();
 
+            // Copy constructor (deleted)
+            Splitter(const Splitter &) = delete;
+
+            // Move constructor (deleted)
+            Splitter(Splitter &&) = delete;
+
             // Destructor
             ~Splitter();
 

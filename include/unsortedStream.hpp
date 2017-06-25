@@ -30,8 +30,14 @@ namespace ch {
             std::ifstream is;
         public:
 
-            // Move constructor
+            // Constructor
             UnsortedStream(std::vector<std::string> && files);
+
+            // Copy constructor (deleted)
+            UnsortedStream(const UnsortedStream<DataType> &) = delete;
+
+            // Move constructor
+            UnsortedStream(UnsortedStream<DataType> && o);
 
             // Destructor
             ~UnsortedStream();
@@ -47,7 +53,7 @@ namespace ch {
      ************ Implementation ****************
     ********************************************/
 
-    // Move constructor
+    // Constructor
     template <class DataType>
     UnsortedStream<DataType>::UnsortedStream(std::vector<std::string> && files): _files(std::move(files)) {
         i = 0;
@@ -57,6 +63,10 @@ namespace ch {
         }
         files.clear();
     }
+
+    // Move constructor
+    template <class DataType>
+    UnsortedStream<DataType>::UnsortedStream(UnsortedStream<DataType> && o): _files{std::move(o._files)}, i{o.i}, is{std::move(o.is)} {}
 
     // Destructor
     template <class DataType>

@@ -27,21 +27,25 @@ namespace ch {
             int _sockfd;
         public:
             // Default constructor
-            ObjectStream(): _sockfd{INVALID_SOCKET} {}
+            ObjectStream();
 
             // From value
-            ObjectStream(int sockfd): _sockfd{sockfd} {}
+            ObjectStream(int sockfd);
+
+            // Copy constructor
+            ObjectStream(const ObjectStream & o) = delete;
+
+            // Move constructor
+            ObjectStream(ObjectStream && o);
 
             // Virtual Destructor
-            virtual ~ObjectStream() {}
+            virtual ~ObjectStream();
 
             // Close the connection
             virtual void close(void) = 0;
 
             // True if the socket is valid
-            inline bool isValid(void) {
-                return _sockfd != INVALID_SOCKET;
-            }
+            bool isValid(void);
     };
 
     /*
@@ -54,6 +58,12 @@ namespace ch {
         public:
             // Default constructor
             ObjectOutputStream();
+
+            // Copy constructor
+            ObjectOutputStream(const ObjectOutputStream<DataType> & o) = delete;
+
+            // Move constructor
+            ObjectOutputStream(ObjectOutputStream<DataType> && o);
 
             // Destructor
             ~ObjectOutputStream();
@@ -81,6 +91,12 @@ namespace ch {
             // From value
             ObjectInputStream(int sockfd);
 
+            // Copy constructor
+            ObjectInputStream(const ObjectInputStream<DataType> & o) = delete;
+
+            // Move constructor
+            ObjectInputStream(ObjectInputStream<DataType> && o);
+
             // Destructor
             ~ObjectInputStream();
 
@@ -96,6 +112,25 @@ namespace ch {
      ************ Implementation ****************
     ********************************************/
 
+    // Default constructor
+    ObjectStream::ObjectStream(): _sockfd{INVALID_SOCKET} {}
+
+    // From value
+    ObjectStream::ObjectStream(int sockfd): _sockfd{sockfd} {}
+
+    // Move constructor
+    ObjectStream::ObjectStream(ObjectStream && o): _sockfd{std::move(o._sockfd)} {
+        o._sockfd = INVALID_SOCKET;
+    }
+
+    // Virtual Destructor
+    ObjectStream::~ObjectStream() {}
+
+    // True if the socket is valid
+    inline bool ObjectStream::isValid(void) {
+        return _sockfd != INVALID_SOCKET;
+    }
+
     template <class DataType>
     inline void ObjectOutputStream<DataType>::sendStopSignal(void) {
         const id_t id_invalid = ID_INVALID;
@@ -105,6 +140,10 @@ namespace ch {
     // Default constructor
     template <class DataType>
     ObjectOutputStream<DataType>::ObjectOutputStream() {}
+
+    // Move constructor
+    template <class DataType>
+    ObjectOutputStream<DataType>::ObjectOutputStream(ObjectOutputStream<DataType> && o): ObjectStream{std::move(o)} {}
 
     // Destructor
     template <class DataType>
@@ -153,6 +192,10 @@ namespace ch {
     // From value
     template <class DataType>
     ObjectInputStream<DataType>::ObjectInputStream(int sockfd): ObjectStream{sockfd} {}
+
+    // Move constructor
+    template <class DataType>
+    ObjectInputStream<DataType>::ObjectInputStream(ObjectInputStream<DataType> && o): ObjectStream{std::move(o)} {}
 
     // Destructor
     template <class DataType>
