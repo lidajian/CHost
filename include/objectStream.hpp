@@ -119,7 +119,7 @@ namespace ch {
     ObjectStream::ObjectStream(int sockfd): _sockfd{sockfd} {}
 
     // Move constructor
-    ObjectStream::ObjectStream(ObjectStream && o): _sockfd{std::move(o._sockfd)} {
+    ObjectStream::ObjectStream(ObjectStream && o): _sockfd{o._sockfd} {
         o._sockfd = INVALID_SOCKET;
     }
 

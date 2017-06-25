@@ -75,9 +75,6 @@ namespace ch {
             // Copy constructor
             Integer(const Integer & i): value{i.value} {}
 
-            // Move constructor
-            Integer(Integer && i): value{i.value} {}
-
             // Destructor
             ~Integer() {}
 
@@ -131,12 +128,6 @@ namespace ch {
             }
             Integer & operator += (const Integer & i) {
                 value += i.value;
-                return (*this);
-            }
-
-            // Move assignment
-            Integer & operator = (Integer && i) {
-                value = std::move(i.value);
                 return (*this);
             }
     };
