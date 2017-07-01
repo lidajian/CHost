@@ -38,7 +38,7 @@ bool parseArgs(const int argc, char * const* argv, std::string & confFilePath, s
     bool hasO = false;
     bool hasJ = false;
 
-    char * current_dir = getcwd(NULL, 0);
+    char * current_dir = getcwd(nullptr, 0);
     std::string current_dir_str(current_dir);
     current_dir_str.push_back('/');
     free(current_dir);

@@ -84,7 +84,7 @@ namespace ch {
     // Sort data if there are no greater than MERGE_SORT_WAY files
     template <class DataType>
     bool LocalFileManager<DataType>::unitMergeSort(const FileIterR & begin, const FileIterR & end) {
-        SortedStream<DataType> stm(begin, end);
+        SortedStream<DataType> stm{begin, end};
         std::ofstream os;
         getStream(os);
         if (os) {
@@ -163,7 +163,7 @@ namespace ch {
 
         // full merge sort first
         while (l >= MERGE_SORT_WAY * MERGE_SORT_WAY) { // loop invariant: index increase -> size decrease
-            std::vector<std::string> files(std::move(dumpFiles));
+            std::vector<std::string> files{std::move(dumpFiles)};
             dumpFiles.clear(); // dumpFiles unspecified, clear dumpFiles
 
             if (!fullMergeSort(files.rbegin(), files.rend())) {
@@ -175,7 +175,7 @@ namespace ch {
 
         // grid merge sort (minimize data read!)
         if (l > MERGE_SORT_WAY) { // assert: index increase -> size decrease
-            std::vector<std::string> files(std::move(dumpFiles));
+            std::vector<std::string> files{std::move(dumpFiles)};
             dumpFiles.clear(); // dumpFiles unspecified, clear dumpFiles
 
             if (!gridMergeSort(files.rbegin(), files.rend())) {
@@ -217,8 +217,8 @@ namespace ch {
     void LocalFileManager<DataType>::getStream(std::ofstream & os) {
         // generate random file name
         std::random_device d;
-        std::default_random_engine generator(d());
-        std::uniform_int_distribution<char> distribution('a', 'z');
+        std::default_random_engine generator{d()};
+        std::uniform_int_distribution<char> distribution{'a', 'z'};
         auto char_dice = std::bind(distribution, generator);
         dumpFiles.emplace_back(dumpFileDir);
         std::string & fullPath = dumpFiles.back();
@@ -231,7 +231,7 @@ namespace ch {
             dumpFiles.pop_back();
             E("(LocalFileManager) Fail to create temporary file.");
             I("Check if there is no space.");
-            std::this_thread::sleep_for(std::chrono::seconds(OPEN_FILESTREAM_RETRY_INTERVAL));
+            std::this_thread::sleep_for(std::chrono::seconds{OPEN_FILESTREAM_RETRY_INTERVAL});
             getStream(os);
         }
     }
@@ -271,7 +271,7 @@ namespace ch {
         if (!doMergeSort()) {
             return nullptr;
         }
-        SortedStream<DataType> * ret = new SortedStream<DataType>(std::move(dumpFiles));
+        SortedStream<DataType> * ret = new SortedStream<DataType>{std::move(dumpFiles)};
         if (ret->isValid()) {
             return ret;
         } else {
@@ -283,7 +283,7 @@ namespace ch {
     // Get unsorted stream with all files
     template <class DataType>
     UnsortedStream<DataType> * LocalFileManager<DataType>::getUnsortedStream() {
-        UnsortedStream<DataType> * ret = new UnsortedStream<DataType>(std::move(dumpFiles));
+        UnsortedStream<DataType> * ret = new UnsortedStream<DataType>{std::move(dumpFiles)};
         if (ret->isValid()) {
             return ret;
         } else {

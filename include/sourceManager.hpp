@@ -37,7 +37,7 @@ namespace ch {
             std::string _jobFileContent;
 
             // Distribution threads
-            std::vector<std::thread *> threads;
+            std::vector<std::thread> threads;
 
             // Results from workers
             std::vector<bool> workerIsSuccess;
@@ -60,7 +60,7 @@ namespace ch {
             SourceManagerMaster(SourceManagerMaster &&) = delete;
 
             // Start distribution threads
-            void startFileDistributionThreads(int serverfd, const ipconfig_t & ips, unsigned short port);
+            void startFileDistributionThreads(const ipconfig_t & ips, unsigned short port = SERVER_PORT);
 
             // Block the current thread until all distribution threads terminate
             void blockTillDistributionThreadsEnd();

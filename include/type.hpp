@@ -236,7 +236,7 @@ namespace ch {
             }
     };
 
-    template <class DataType_1, class DataType_2>
+    template <typename DataType_1, typename DataType_2>
     class Tuple: public TypeBase {
         public:
             DataType_1 first;

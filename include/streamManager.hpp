@@ -15,6 +15,7 @@
 #include <fstream> // ofstream
 #include <thread> // thread
 #include <chrono> // seconds
+#include <memory> // unique_ptr
 
 #include "objectStream.hpp" // ObjectInputStream, ObjectOutputStream
 #include "dataManager.hpp" // DataManager
@@ -34,6 +35,9 @@ namespace ch {
 
             // Number of machines in the cluster
             size_t clusterSize;
+
+            // True if connected
+            bool connected;
 
             // Receive threads
             std::vector<std::thread> receiveThreads;
@@ -78,6 +82,9 @@ namespace ch {
 
             // True if receive threads exists
             bool isReceiving(void) const;
+
+            // True if connected
+            bool isConnected(void) const;
 
             // Start receive on all sockets
             void startRecvThreads(void);
@@ -164,7 +171,7 @@ namespace ch {
     // sets stmr to the created object output stream if success
     template <class DataType>
     void StreamManager<DataType>::connectThread(const std::string & ip, ObjectOutputStream<DataType> * & stmr) {
-        ObjectOutputStream<DataType> * stm = new ObjectOutputStream<DataType>();
+        ObjectOutputStream<DataType> * stm = new ObjectOutputStream<DataType>{};
         int tries = 0;
         while (tries < MAX_CONNECTION_ATTEMPT && !(stm->open(ip, STREAMMANAGER_PORT))) {
             ++tries;
@@ -231,12 +238,12 @@ namespace ch {
         ostreams.resize(clusterSize, nullptr);
 
         // create server thread to accept connection
-        std::thread server_thread(serverThread, serverfd, std::ref(ips), std::ref(istreams));
+        std::thread server_thread{serverThread, serverfd, std::ref(ips), std::ref(istreams)};
 
         // create connect thread to connect to server
         std::vector<std::thread> connectThreads;
         for (size_t i = 1; i < clusterSize; ++i) {
-            connectThreads.emplace_back(std::thread(connectThread, std::ref(ips[i].second), std::ref(ostreams[ips[i].first])));
+            connectThreads.emplace_back(connectThread, std::ref(ips[i].second), std::ref(ostreams[ips[i].first]));
         }
 
         // Join server thread and connect threads
@@ -261,14 +268,13 @@ namespace ch {
             return;
         }
 
+        connected = true;
         P("(StreamManager) Connection set up successfully.");
-
-        startRecvThreads();
     }
 
     // Constructor: given directory of configuration
     template <class DataType>
-    StreamManager<DataType>::StreamManager(const std::string & configureFile, const std::string & dir, size_t maxDataSize, bool presort): _data{dir, maxDataSize, presort} {
+    StreamManager<DataType>::StreamManager(const std::string & configureFile, const std::string & dir, size_t maxDataSize, bool presort): connected{false}, _data{dir, maxDataSize, presort} {
         ipconfig_t ips;
         if (!readIPs(configureFile, ips)) {
             return;
@@ -283,7 +289,7 @@ namespace ch {
 
     // Constructor: given vector of IP configuration
     template <class DataType>
-    StreamManager<DataType>::StreamManager(const ipconfig_t & ips, const std::string & dir, size_t maxDataSize, bool presort): clusterSize{ips.size()}, _data{dir, maxDataSize, presort} {
+    StreamManager<DataType>::StreamManager(const ipconfig_t & ips, const std::string & dir, size_t maxDataSize, bool presort): clusterSize{ips.size()}, connected{false}, _data{dir, maxDataSize, presort} {
         if (clusterSize > 0) {
             init(ips);
         } else {
@@ -310,7 +316,13 @@ namespace ch {
     // True if receive threads exists
     template <class DataType>
     inline bool StreamManager<DataType>::isReceiving(void) const {
-        return (receiveThreads.size() > 0);
+        return (receiveThreads.size() + 1 == clusterSize);
+    }
+
+    // True if connected
+    template <class DataType>
+    inline bool StreamManager<DataType>::isConnected(void) const {
+        return connected;
     }
 
     // Start receive on all sockets
@@ -318,10 +330,10 @@ namespace ch {
     void StreamManager<DataType>::startRecvThreads(void) {
         if (isReceiving()) {
             D("(StreamManager) Already receiving.");
-        } else {
+        } else if (isConnected()) {
 
             for (size_t i = 0; i < clusterSize - 1; i++) {
-                receiveThreads.emplace_back(std::thread(recvThread, std::ref(istreams[i]), std::ref(_data)));
+                receiveThreads.emplace_back(recvThread, std::ref(istreams[i]), std::ref(_data));
             }
         }
     }
@@ -386,18 +398,19 @@ namespace ch {
         if (os) {
             UnsortedStream<DataType> * unsorted = _data.getUnsortedStream();
             if (unsorted) {
+
+                std::unique_ptr<UnsortedStream<DataType> > _unsorted{unsorted};
+
                 DataType temp;
                 while (unsorted->get(temp)) {
                     os << temp.toString() << std::endl;
                     if (!os) {
                         E("(StreamManager) Fail to write to text file.");
                         I("Check if there is no space.");
-                        delete unsorted;
                         os.close();
                         return false;
                     }
                 }
-                delete unsorted;
             }
             os.close();
             return true;

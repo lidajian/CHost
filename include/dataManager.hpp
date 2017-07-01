@@ -19,7 +19,7 @@ namespace ch {
      ************** Declaration *****************
     ********************************************/
 
-    template <class DataType>
+    template <typename DataType>
     class DataManager {
         protected:
             // Sort the data before dumping to file
@@ -75,34 +75,33 @@ namespace ch {
     ********************************************/
 
     // Clear the data manager
-    template <class DataType>
+    template <typename DataType>
     void DataManager<DataType>::clear() {
-        _dataLock.lock();
-        _data.clear();
-        _dataLock.unlock();
         fileManager.clear();
+        std::lock_guard<std::mutex> holder{_dataLock};
+        _data.clear();
     }
 
     // Dereference pointer and compare
-    template <class DataType>
+    template <typename DataType>
     bool DataManager<DataType>::pointerComp (const DataType * l, const DataType * r) {
         return (*l) < (*r);
     }
 
     // Constructor
-    template <class DataType>
+    template <typename DataType>
     DataManager<DataType>::DataManager (const std::string & dir, size_t maxDataSize, bool presort): _presort{presort}, _maxDataSize{maxDataSize}, fileManager{dir} {}
 
     // Destructor
-    template <class DataType>
+    template <typename DataType>
     DataManager<DataType>::~DataManager() {
         clear();
     }
 
     // Store the data on heap
-    template <class DataType>
+    template <typename DataType>
     bool DataManager<DataType>::store(const DataType * v) {
-        std::lock_guard<std::mutex> holder(_dataLock);
+        std::lock_guard<std::mutex> holder{_dataLock};
         _data.push_back(v);
         if (_data.size() == _maxDataSize) {
             if (_presort) sort(std::begin(_data), std::end(_data), pointerComp);
@@ -112,10 +111,10 @@ namespace ch {
     }
 
     // Store data on stack
-    template <class DataType>
+    template <typename DataType>
     bool DataManager<DataType>::store(const DataType & v) {
-        DataType * nv = new DataType(v);
-        std::lock_guard<std::mutex> holder(_dataLock);
+        DataType * nv = new DataType{v};
+        std::lock_guard<std::mutex> holder{_dataLock};
         _data.push_back(nv);
         if (_data.size() == _maxDataSize) {
             if (_presort) sort(std::begin(_data), std::end(_data), pointerComp);
@@ -125,9 +124,9 @@ namespace ch {
     }
 
     // Get sorted stream from file manager
-    template <class DataType>
+    template <typename DataType>
     SortedStream<DataType> * DataManager<DataType>::getSortedStream() {
-        std::lock_guard<std::mutex> holder(_dataLock);
+        std::lock_guard<std::mutex> holder{_dataLock};
         if (!_presort) {
             return nullptr;
         }
@@ -142,9 +141,9 @@ namespace ch {
     }
 
     // Get unsorted stream from file manager
-    template <class DataType>
+    template <typename DataType>
     UnsortedStream<DataType> * DataManager<DataType>::getUnsortedStream () {
-        std::lock_guard<std::mutex> holder(_dataLock);
+        std::lock_guard<std::mutex> holder{_dataLock};
         if (_data.size() != 0) {
             if (!fileManager.dumpToFile(_data)) {
                 E("(DataManager) Fail to dump the remaining data to file.");
@@ -154,7 +153,7 @@ namespace ch {
         return fileManager.getUnsortedStream();
     }
 
-    template <class DataType>
+    template <typename DataType>
     void DataManager<DataType>::setPresort(bool presort) {
         _presort = presort;
     }

@@ -18,8 +18,10 @@ $(EXECS): % : %.cpp $(OBJS_PATHS)
 .PHONY: build
 build:
 	mkdir -p $(BUILD_PREFIX)
+	mkdir -p $(TEMP_PREFIX)
 
 .PHONY: clean
 clean:
 	rm -rf $(BUILD_PREFIX)/$(OBJ)
 	@(rmdir $(BUILD_PREFIX) 2> /dev/null; exit 0)
+	@(rmdir $(TEMP_PREFIX) 2> /dev/null; exit 0)

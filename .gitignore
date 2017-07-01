@@ -1,4 +1,5 @@
 *.o
 *.tar
 bin/
-
+tmp/
+tbin/

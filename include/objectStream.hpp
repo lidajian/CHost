@@ -219,7 +219,7 @@ namespace ch {
         id_t id = ID_INVALID;
         if (precv(_sockfd, static_cast<void *>(&id), sizeof(id_t))) {
             if (id == DataType::getId()) {
-                DataType * v = new DataType();
+                DataType * v = new DataType{};
                 if (!(v->recv(_sockfd))) {
                     delete v;
                     return nullptr;

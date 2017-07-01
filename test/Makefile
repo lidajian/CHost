@@ -1,16 +1,31 @@
 INC_DIR = ../include
+SRC_DIR = ../src
+TEMP_PREFIX = ../tmp
+BUILD_PREFIX = ../tbin
 
 CXX = g++
 CFLAGS += -D _DEBUG -D _SUGGEST -D _ERROR -Wall -std=c++11 -I$(INC_DIR)
 LDFLAGS += -lpthread
-TESTS = streamManager type
-OBJS = $(foreach TEST, $(TESTS), test_$(TEST))
+OBJS = sourceManager utils splitter
+OBJS_PATHS = $(foreach OBJ, $(OBJS), $(TEMP_PREFIX)/$(OBJ).o)
+TESTS = streamManager type threadPool
+EXECS = $(foreach TEST, $(TESTS), test_$(TEST))
 
-all: $(OBJS)
+all: build $(OBJS) $(EXECS)
 
-test_%: test_%.cpp $(INC_DIR)/%.hpp
-	$(CXX) $(CFLAGS) $(LDFLAGS) $< -o $@
+$(OBJS) : % : $(SRC_DIR)/%.cpp
+	$(CXX) $(CFLAGS) -c $^ -o $(TEMP_PREFIX)/$@.o
+
+test_%: test_%.cpp $(OBJS_PATHS)
+	$(CXX) $(CFLAGS) $(LDFLAGS) $^ -o $(BUILD_PREFIX)/$@
+
+.PHONY: build
+build:
+	mkdir -p $(TEMP_PREFIX)
+	mkdir -p $(BUILD_PREFIX)
 
 .PHONY: clean
 clean:
-	rm -rf $(OBJS)
+	rm -rf $(EXECS) $(OBJS_PATHS)
+	@(rmdir $(TEMP_PREFIX) 2> /dev/null; exit 0)
+	@(rmdir $(BUILD_PREFIX) 2> /dev/null; exit 0)

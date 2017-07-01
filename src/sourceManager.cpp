@@ -75,22 +75,20 @@ namespace ch {
         }
     }
 
-    void SourceManagerMaster::startFileDistributionThreads(int serverfd, const ipconfig_t & ips, unsigned short port) {
+    void SourceManagerMaster::startFileDistributionThreads(const ipconfig_t & ips, unsigned short port) {
         if (!isValid()) {
             D("(SourceManagerMaster) Cannot start distribution when data file is not opened.");
             return;
         }
         workerIsSuccess.resize(ips.size(), false);
         for (size_t i = 1, l = ips.size(); i < l; ++i) {
-            std::thread * t = new std::thread(distributionThread, i, std::ref(ips), port, this);
-            threads.push_back(t);
+            threads.emplace_back(distributionThread, i, std::ref(ips), port, this);
         }
     }
 
     void SourceManagerMaster::blockTillDistributionThreadsEnd() {
-        for (std::thread * t: threads) {
-            t->join();
-            delete t;
+        for (std::thread & t: threads) {
+            t.join();
         }
         threads.clear();
     }

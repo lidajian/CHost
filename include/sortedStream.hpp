@@ -11,6 +11,7 @@
 #include <queue> // priority_queue
 #include <string> // string
 #include <fstream> // ifstream
+#include <memory> // shared_ptr
 
 namespace ch {
 
@@ -39,7 +40,9 @@ namespace ch {
             std::vector<std::string> _files;
 
             // Min heap for streams
-            std::priority_queue<std::pair<DataType, std::ifstream *>, std::vector<std::pair<DataType, std::ifstream *> >, pairComparator<DataType, std::ifstream *, true> > minHeap;
+            std::priority_queue<std::pair<DataType, std::shared_ptr<std::ifstream> >,
+                std::vector<std::pair<DataType, std::shared_ptr<std::ifstream> > >,
+                pairComparator<DataType, std::shared_ptr<std::ifstream>, true> > minHeap;
         public:
 
             // Constructor
@@ -75,12 +78,9 @@ namespace ch {
         files.clear();
         DataType temp;
         for (const std::string & file: _files) {
-            std::ifstream * is = new std::ifstream(file);
+            std::shared_ptr<std::ifstream> is{new std::ifstream{file}};
             if ((*is) && ((*is) >> temp)) {
-                minHeap.push(std::make_pair<DataType, std::ifstream *>(std::move(temp), std::move(is)));
-            } else {
-                is->close();
-                delete is;
+                minHeap.push(std::make_pair<DataType, std::shared_ptr<std::ifstream> >(std::move(temp), std::move(is)));
             }
         }
     }
@@ -92,13 +92,10 @@ namespace ch {
         DataType temp;
         FileIter_T it = begin;
         while (it < end) {
-            std::ifstream * is = new std::ifstream(*it);
+            std::shared_ptr<std::ifstream> is{new std::ifstream{*it}};
             _files.push_back(std::move(*it));
             if ((*is) && ((*is) >> temp)) {
-                minHeap.push(std::make_pair<DataType, std::ifstream *>(std::move(temp), std::move(is)));
-            } else {
-                is->close();
-                delete is;
+                minHeap.push(std::make_pair<DataType, std::shared_ptr<std::ifstream> >(std::move(temp), std::move(is)));
             }
             ++it;
         }
@@ -114,10 +111,8 @@ namespace ch {
     // Destructor
     template <class DataType>
     SortedStream<DataType>::~SortedStream() {
-        while (minHeap.size()) {
-            std::ifstream * is = minHeap.top().second;
-            is->close();
-            delete is;
+
+        while (!minHeap.empty()) {
             minHeap.pop();
         }
         for (const std::string & file: _files) {
@@ -137,15 +132,11 @@ namespace ch {
         if (!isValid()) {
             return false;
         }
-        std::pair<DataType, std::ifstream *> top(std::move(minHeap.top()));
+        std::pair<DataType, std::shared_ptr<std::ifstream> > top{std::move(minHeap.top())};
         minHeap.pop();
         ret = std::move(top.first);
-        std::ifstream * is = top.second;
-        if((*is) >> top.first) {
+        if((*(top.second)) >> top.first) {
             minHeap.push(std::move(top));
-        } else {
-            is->close();
-            delete is;
         }
         return true;
     }

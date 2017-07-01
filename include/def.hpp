@@ -66,16 +66,16 @@ P(tss.str().c_str())
 #define INVALID_SOCKET (~0)
 #define INVALID (~0)
 
+// Ports
 #define STREAMMANAGER_PORT 8711
 #define SERVER_PORT 8712
-#define MAX_CONNECTION_ATTEMPT 15
 
-#define BUFFER_SIZE 1024
-#define DATA_BLOCK_SIZE 65536
+// Macro functions
 #define MIN_VAL(a, b) ((a < b) ? a : b)
 #define IS_ESCAPER(c) (c == '\r' || c == '\n')
 #define LENGTH_CONST_CHAR_ARRAY(s) (sizeof(s) - 1) // exclude '\0'
 
+// Constants
 #define TEMP_DIR "/.CHost"
 #define IPCONFIG_FILE "/ipconfig"
 #define JOB_FILE "/job"
@@ -87,6 +87,24 @@ P(tss.str().c_str())
 #define OPEN_FILESTREAM_RETRY_INTERVAL 60 // seconds
 #define CONNECTION_RETRY_INTERVAL 1 // seconds
 #define ACCEPT_TIMEOUT 5 // seconds
+#define MAX_CONNECTION_ATTEMPT 15
+#define BUFFER_SIZE 1024
+#define DATA_BLOCK_SIZE 65536
+
+// Enable epoll on Linux
+#ifdef __gnu_linux__
+#define __CH_EPOLL__
+#endif
+
+// Enable kqueue on FreeBSD
+#ifdef __MACH__
+#define __CH_KQUEUE__
+#endif
+
+// Enable kqueue on FreeBSD
+#ifdef __FreeBSD__
+#define __CH_KQUEUE__
+#endif
 
 typedef std::vector<std::pair<size_t, std::string> > ipconfig_t;
 

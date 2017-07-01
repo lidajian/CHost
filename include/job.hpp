@@ -7,6 +7,7 @@
 
 #include <string> // string
 #include <vector> // vector
+#include <memory> // unique_ptr
 
 #include "def.hpp" // ipconfig_t
 #include "sourceManager.hpp" // SourceManager
@@ -28,15 +29,16 @@ namespace ch {
                            ch::SourceManager & source,
                            const std::string & outputFilePath,
                            const std::string & workingDir,
-                           const bool isServer = false): _ips(ips), _source(source), _outputFilePath(outputFilePath), _workingDir(workingDir), _isServer(isServer) {}
+                           const bool isServer = false): _ips{ips}, _source{source}, _outputFilePath{outputFilePath}, _workingDir{workingDir}, _isServer{isServer} {}
     };
 
+    // Job function type
     typedef bool job_f(context_t & context);
 
     /*
      * Default mapper definition
      */
-    template <class MapperOutputType>
+    template <typename MapperOutputType>
     void mapper(std::string & block, StreamManager<MapperOutputType> & sm) {
         E("Cannot find mapper function.");
         return;
@@ -45,7 +47,7 @@ namespace ch {
     /*
      * Default reducer definition
      */
-    template <class ReducerInputType, class ReducerOutputType>
+    template <typename ReducerInputType, typename ReducerOutputType>
     void reducer(SortedStream<ReducerInputType> & ss, StreamManager<ReducerOutputType> & sm) {
         E("Cannot find reducer function.");
         return;
@@ -55,80 +57,120 @@ namespace ch {
      * Simple job:
      * output type of mapper and reducer are the same so that we can reuse stream manager
      */
-    template <class MapperReducerOutputType>
+    template <typename MapperReducerOutputType>
     bool simpleJob(context_t & context) {
         std::string polled;
-        StreamManager<MapperReducerOutputType> stm(context._ips, context._workingDir, DEFAULT_MAX_DATA_SIZE);
-        if (stm.isReceiving()) {
-            while (context._source.poll(polled)) {
-                mapper(polled, stm);
-            }
-            stm.stopSend();
-            stm.blockTillRecvEnd();
 
-            SortedStream<MapperReducerOutputType> * sorted = stm.getSortedStream();
-            if (sorted) {
-                stm.setPresort(false);
-                stm.startRecvThreads();
-                reducer(*sorted, stm);
+        StreamManager<MapperReducerOutputType> stm{context._ips, context._workingDir, DEFAULT_MAX_DATA_SIZE};
 
-                delete sorted;
-
-                stm.finalizeSend();
-                stm.blockTillRecvEnd();
-
-                if (context._isServer) {
-                    return stm.pourToTextFile(context._outputFilePath.c_str());
-                }
-            }
-            return true;
-        } else {
-            D("Job: StreamManager failed. Nothing done.\n");
+        if (!stm.isConnected()) { // Not connected
+            E("(Job) StreamManager connect failed. Nothing done.");
+            return false;
         }
-        return false;
+
+        stm.startRecvThreads();
+
+        if (!stm.isReceiving()) { // Fail to start receive threads
+            E("(Job) StreamManager start receive threads failed. Nothing done.");
+            return false;
+        }
+
+        // Map
+        while (context._source.poll(polled)) {
+            mapper(polled, stm);
+        }
+        stm.stopSend();
+        stm.blockTillRecvEnd();
+        // End of map
+
+        SortedStream<MapperReducerOutputType> * sorted = stm.getSortedStream();
+
+        if (sorted) {
+
+            std::unique_ptr<SortedStream<MapperReducerOutputType> > _sorted{sorted};
+
+            stm.setPresort(false);
+            stm.startRecvThreads();
+
+            if (!stm.isReceiving()) { // Fail to start receive threads
+                E("(Job) StreamManager start receive threads failed. Fail to perform reduce on this machine.");
+                return false;
+            }
+
+            // Reduce
+            reducer(*sorted, stm);
+            stm.finalizeSend();
+            stm.blockTillRecvEnd();
+            // End of reduce
+
+            if (context._isServer) {
+                return stm.pourToTextFile(context._outputFilePath.c_str());
+            }
+        }
+        return true;
     }
 
     /*
      * Complete job:
      * output type of mapper and reducer are different
      */
-    template <class MapperOutputType, class ReducerOutputType>
+    template <typename MapperOutputType, typename ReducerOutputType>
     bool completeJob(context_t & context) {
         std::string polled;
-        StreamManager<MapperOutputType> stm_mapper(context._ips, context._workingDir, DEFAULT_MAX_DATA_SIZE);
-        if (stm_mapper.isReceiving()) {
-            while (context._source.poll(polled)) {
-                mapper(polled, stm_mapper);
-            }
-            stm_mapper.finalizeSend();
-            stm_mapper.blockTillRecvEnd();
 
-            SortedStream<MapperOutputType> * sorted = stm_mapper.getSortedStream();
-            if (sorted) {
-                StreamManager<ReducerOutputType> stm_reducer(context._ips, context._workingDir, DEFAULT_MAX_DATA_SIZE, false);
+        StreamManager<MapperOutputType> stm_mapper{context._ips, context._workingDir, DEFAULT_MAX_DATA_SIZE};
 
-                if (stm_reducer.isReceiving()) {
-                    reducer(*sorted, stm_reducer);
-
-                    delete sorted;
-
-                    stm_reducer.finalizeSend();
-                    stm_reducer.blockTillRecvEnd();
-
-                    if (context._isServer) {
-                        return stm_reducer.pourToTextFile(context._outputFilePath.c_str());
-                    }
-                } else {
-                    D("Job: StreamManager failed. Fail to perform reduce on this machine.\n");
-                    delete sorted;
-                    return false;
-                }
-            }
-            return true;
-        } else {
-            D("Job: StreamManager failed. Nothing done.\n");
+        if (!stm_mapper.isConnected()) { // Not connected
+            E("(Job) StreamManager connect failed. Nothing done.");
+            return false;
         }
-        return false;
+
+        stm_mapper.startRecvThreads();
+
+        if (!stm_mapper.isReceiving()) { // Fail to start receive threads
+            E("(Job) StreamManager start receive threads failed. Nothing done.");
+            return false;
+        }
+
+        // Map
+        while (context._source.poll(polled)) {
+            mapper(polled, stm_mapper);
+        }
+        stm_mapper.finalizeSend();
+        stm_mapper.blockTillRecvEnd();
+        // End of map
+
+        SortedStream<MapperOutputType> * sorted = stm_mapper.getSortedStream();
+
+        if (sorted) {
+
+            std::unique_ptr<SortedStream<MapperOutputType> > _sorted{sorted};
+
+            StreamManager<ReducerOutputType> stm_reducer{context._ips, context._workingDir, DEFAULT_MAX_DATA_SIZE, false};
+
+            if (!stm_reducer.isConnected()) { // Not connected
+                E("(Job) StreamManager connect failed. Fail to perform reduce on this machine.");
+                return false;
+            }
+
+            stm_reducer.startRecvThreads();
+
+            if (!stm_reducer.isReceiving()) { // Fail to start receive threads
+                E("(Job) StreamManager start receive threads failed. Fail to perform reduce on this machine.");
+                return false;
+            }
+
+            // Reduce
+            reducer(*sorted, stm_reducer);
+            stm_reducer.finalizeSend();
+            stm_reducer.blockTillRecvEnd();
+            // End of reduce
+
+            if (context._isServer) {
+                return stm_reducer.pourToTextFile(context._outputFilePath.c_str());
+            }
+        }
+        return true;
     }
 }
 

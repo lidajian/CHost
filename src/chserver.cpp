@@ -11,18 +11,19 @@
 
 // TODO fault tolerence (error process)
 // TODO multi-thread
+// TODO epoll/kqueue
 std::string confFilePath;
 std::string workingDir;
 
 // Get job function from job library and run the job
 bool runJob(const ipconfig_t & ips, ch::SourceManager & source, const std::string & outputFilePath, const std::string & jobFilePath, const bool isServer) {
     void * jobLib = dlopen(jobFilePath.c_str(), RTLD_LAZY);
-    if (jobLib == NULL) {
+    if (jobLib == nullptr) {
         E("Cannot find library file.");
         return false;
     } else {
         const ch::job_f * doJob = (ch::job_f *)dlsym(jobLib, "doJob");
-        if (doJob == NULL) {
+        if (doJob == nullptr) {
             E("No doJob function found in the library.");
             I("Please implement doJob function in the library.");
             return false;
@@ -111,7 +112,7 @@ bool asMaster(int sockfd) {
 
     if (source.isValid()) {
 
-        source.startFileDistributionThreads(sockfd, ips, SERVER_PORT);
+        source.startFileDistributionThreads(ips);
 
         // do job
 

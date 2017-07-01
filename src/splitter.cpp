@@ -35,7 +35,7 @@ namespace ch {
     // Get next split of data
     bool Splitter::next(std::string & res) {
         res.clear();
-        std::lock_guard<std::mutex> holder(readLock);
+        std::lock_guard<std::mutex> holder{readLock};
         if (!isValid()) {
             return false;
         }
