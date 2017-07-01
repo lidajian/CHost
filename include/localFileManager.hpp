@@ -27,7 +27,7 @@ namespace ch {
 
     typedef std::vector<std::string>::reverse_iterator FileIterR;
 
-    template <class DataType>
+    template <typename DataType>
     class LocalFileManager {
         protected:
             // Directory of dump file
@@ -82,7 +82,7 @@ namespace ch {
     ********************************************/
 
     // Sort data if there are no greater than MERGE_SORT_WAY files
-    template <class DataType>
+    template <typename DataType>
     bool LocalFileManager<DataType>::unitMergeSort(const FileIterR & begin, const FileIterR & end) {
         SortedStream<DataType> stm{begin, end};
         std::ofstream os;
@@ -107,7 +107,7 @@ namespace ch {
 
     // Sort data if there are less than MERGE_SORT_WAY * MERGE_SORT_WAY files
     // and greater than MERGE_SORT_WAY files
-    template <class DataType>
+    template <typename DataType>
     bool LocalFileManager<DataType>::gridMergeSort (const FileIterR & begin, const FileIterR & end) {
         const int l = end - begin - MERGE_SORT_WAY; // reserve for all slot
         const int fullSlots = l / (MERGE_SORT_WAY - 1); // number of full merges in Step 1
@@ -142,7 +142,7 @@ namespace ch {
     }
 
     // Sort data if there are no less than MERGE_SORT_WAY * MERGE_SORT_WAY files
-    template <class DataType>
+    template <typename DataType>
     bool LocalFileManager<DataType>::fullMergeSort (const FileIterR & begin, const FileIterR & end) {
         FileIterR it = end;
         FileIterR next_it = end - MERGE_SORT_WAY;
@@ -157,7 +157,7 @@ namespace ch {
     }
 
     // Entry that actually do merge sort
-    template <class DataType>
+    template <typename DataType>
     bool LocalFileManager<DataType>::doMergeSort () {
         size_t l = dumpFiles.size();
 
@@ -188,23 +188,23 @@ namespace ch {
     }
 
     // Constructor
-    template <class DataType>
+    template <typename DataType>
     LocalFileManager<DataType>::LocalFileManager(const std::string & dir): dumpFileDir{dir} {}
 
     // Move constructor
-    template <class DataType>
+    template <typename DataType>
     LocalFileManager<DataType>::LocalFileManager(LocalFileManager<DataType> && o): dumpFileDir{o.dumpFileDir}, dumpFiles{std::move(o.dumpFiles)} {
         o.dumpFiles.clear();
     }
 
     // Destructor
-    template <class DataType>
+    template <typename DataType>
     LocalFileManager<DataType>::~LocalFileManager() {
         clear();
     }
 
     // Remove all temporary files
-    template <class DataType>
+    template <typename DataType>
     void LocalFileManager<DataType>::clear() {
         for (const std::string & file: dumpFiles) {
             unlink(file.c_str());
@@ -213,7 +213,7 @@ namespace ch {
     }
 
     // Get output file stream of a new temporary file
-    template <class DataType>
+    template <typename DataType>
     void LocalFileManager<DataType>::getStream(std::ofstream & os) {
         // generate random file name
         std::random_device d;
@@ -237,7 +237,7 @@ namespace ch {
     }
 
     // Dump data to file
-    template <class DataType>
+    template <typename DataType>
     bool LocalFileManager<DataType>::dumpToFile(std::vector<const DataType *> & data) {
         std::ofstream os;
         getStream(os);
@@ -266,7 +266,7 @@ namespace ch {
     }
 
     // Get sorted stream with all files
-    template <class DataType>
+    template <typename DataType>
     SortedStream<DataType> * LocalFileManager<DataType>::getSortedStream() {
         if (!doMergeSort()) {
             return nullptr;
@@ -281,7 +281,7 @@ namespace ch {
     }
 
     // Get unsorted stream with all files
-    template <class DataType>
+    template <typename DataType>
     UnsortedStream<DataType> * LocalFileManager<DataType>::getUnsortedStream() {
         UnsortedStream<DataType> * ret = new UnsortedStream<DataType>{std::move(dumpFiles)};
         if (ret->isValid()) {

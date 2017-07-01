@@ -17,7 +17,7 @@ namespace ch {
      ************** Declaration *****************
     ********************************************/
 
-    template <class DataType>
+    template <typename DataType>
     class UnsortedStream {
         protected:
             // Files it manages
@@ -54,7 +54,7 @@ namespace ch {
     ********************************************/
 
     // Constructor
-    template <class DataType>
+    template <typename DataType>
     UnsortedStream<DataType>::UnsortedStream(std::vector<std::string> && files): _files(std::move(files)) {
         i = 0;
         while (!isValid() && i < _files.size()) {
@@ -65,11 +65,11 @@ namespace ch {
     }
 
     // Move constructor
-    template <class DataType>
+    template <typename DataType>
     UnsortedStream<DataType>::UnsortedStream(UnsortedStream<DataType> && o): _files{std::move(o._files)}, i{o.i}, is{std::move(o.is)} {}
 
     // Destructor
-    template <class DataType>
+    template <typename DataType>
     UnsortedStream<DataType>::~UnsortedStream() {
         for (const std::string & file: _files) {
             unlink(file.c_str());
@@ -77,13 +77,13 @@ namespace ch {
     }
 
     // True if stream is good
-    template <class DataType>
+    template <typename DataType>
     inline bool UnsortedStream<DataType>::isValid() {
         return bool(is);
     }
 
     // Get data from stream
-    template <class DataType>
+    template <typename DataType>
     bool UnsortedStream<DataType>::get(DataType & ret) {
 
         while (!(isValid() && (is >> ret))) {

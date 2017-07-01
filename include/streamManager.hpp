@@ -27,7 +27,7 @@ namespace ch {
      ************** Declaration *****************
     ********************************************/
 
-    template <class DataType>
+    template <typename DataType>
     class StreamManager {
         protected:
             // Id of the machine
@@ -118,7 +118,7 @@ namespace ch {
     ********************************************/
 
     // Server thread: accept connections
-    template <class DataType>
+    template <typename DataType>
     void StreamManager<DataType>::serverThread(int serverfd, const ipconfig_t & ips, std::vector<ObjectInputStream<DataType> *> & istreams) {
 
         sockaddr_in remote;
@@ -169,7 +169,7 @@ namespace ch {
 
     // Connect thread: connect to servers
     // sets stmr to the created object output stream if success
-    template <class DataType>
+    template <typename DataType>
     void StreamManager<DataType>::connectThread(const std::string & ip, ObjectOutputStream<DataType> * & stmr) {
         ObjectOutputStream<DataType> * stm = new ObjectOutputStream<DataType>{};
         int tries = 0;
@@ -189,7 +189,7 @@ namespace ch {
     }
 
     // Receive thread: receive objects and store
-    template <class DataType>
+    template <typename DataType>
     void StreamManager<DataType>::recvThread(ObjectInputStream<DataType> * & stm, DataManager<DataType> & data) {
         DataType * got = nullptr;
         while ((got = stm->recv())) {
@@ -200,7 +200,7 @@ namespace ch {
     }
 
     // Close and clear all streams
-    template <class DataType>
+    template <typename DataType>
     void StreamManager<DataType>::clearStreams() {
         for (ObjectOutputStream<DataType> * stm: ostreams) {
             if (stm != nullptr) {
@@ -221,7 +221,7 @@ namespace ch {
     // Initialize streams
     // 1. Accept and connect to all machines
     // 2. Start receive threads if step 1 success
-    template <class DataType>
+    template <typename DataType>
     void StreamManager<DataType>::init(const ipconfig_t & ips){
 
         selfId = ips[0].first;
@@ -273,7 +273,7 @@ namespace ch {
     }
 
     // Constructor: given directory of configuration
-    template <class DataType>
+    template <typename DataType>
     StreamManager<DataType>::StreamManager(const std::string & configureFile, const std::string & dir, size_t maxDataSize, bool presort): connected{false}, _data{dir, maxDataSize, presort} {
         ipconfig_t ips;
         if (!readIPs(configureFile, ips)) {
@@ -288,7 +288,7 @@ namespace ch {
     }
 
     // Constructor: given vector of IP configuration
-    template <class DataType>
+    template <typename DataType>
     StreamManager<DataType>::StreamManager(const ipconfig_t & ips, const std::string & dir, size_t maxDataSize, bool presort): clusterSize{ips.size()}, connected{false}, _data{dir, maxDataSize, presort} {
         if (clusterSize > 0) {
             init(ips);
@@ -300,7 +300,7 @@ namespace ch {
     // Destructor
     // Send stop signal to other machines and block until receive threads end
     // Close and clear all streams
-    template <class DataType>
+    template <typename DataType>
     StreamManager<DataType>::~StreamManager(){
 
         finalizeSend();
@@ -314,19 +314,19 @@ namespace ch {
 
 
     // True if receive threads exists
-    template <class DataType>
+    template <typename DataType>
     inline bool StreamManager<DataType>::isReceiving(void) const {
         return (receiveThreads.size() + 1 == clusterSize);
     }
 
     // True if connected
-    template <class DataType>
+    template <typename DataType>
     inline bool StreamManager<DataType>::isConnected(void) const {
         return connected;
     }
 
     // Start receive on all sockets
-    template <class DataType>
+    template <typename DataType>
     void StreamManager<DataType>::startRecvThreads(void) {
         if (isReceiving()) {
             D("(StreamManager) Already receiving.");
@@ -340,7 +340,7 @@ namespace ch {
 
     // Send stop signal to other machines, cause receive thread on other machines to terminate and close connection
     // called when we don't need these connections anymore
-    template <class DataType>
+    template <typename DataType>
     void StreamManager<DataType>::finalizeSend(void) {
         for (ObjectOutputStream<DataType> * stm: ostreams) {
             if (stm != nullptr) {
@@ -353,7 +353,7 @@ namespace ch {
 
     // Send stop signal to other machines, cause receive thread on other machines to terminate
     // called when we need to temporarily stop receiving (e.g. switch from map to reduce)
-    template <class DataType>
+    template <typename DataType>
     void StreamManager<DataType>::stopSend(void) {
         for (ObjectOutputStream<DataType> * stm: ostreams) {
             if (stm != nullptr) {
@@ -363,7 +363,7 @@ namespace ch {
     }
 
     // Cause the current thread to block until all receive thread end and clear resource of receive threads
-    template <class DataType>
+    template <typename DataType>
     void StreamManager<DataType>::blockTillRecvEnd(void) {
         if (isReceiving()) {
             for (std::thread & thrd: receiveThreads) {
@@ -375,7 +375,7 @@ namespace ch {
     }
 
     // Push data to the specific machine (partitioned by partitioner)
-    template <class DataType>
+    template <typename DataType>
     bool StreamManager<DataType>::push(DataType & v, const Partitioner & partitioner) {
         size_t id = partitioner.getPartition(v.hashCode(), clusterSize);
         if (id == selfId) {
@@ -386,13 +386,13 @@ namespace ch {
     }
 
     // Get sorted stream from data manager
-    template <class DataType>
+    template <typename DataType>
     SortedStream<DataType> * StreamManager<DataType>::getSortedStream () {
         return _data.getSortedStream();
     }
 
     // Pour data to text file with temporary files in data manager
-    template <class DataType>
+    template <typename DataType>
     bool StreamManager<DataType>::pourToTextFile (const char * path) {
         std::ofstream os(path);
         if (os) {
@@ -422,7 +422,7 @@ namespace ch {
     }
 
     // Set presort of data manager
-    template <class DataType>
+    template <typename DataType>
     void StreamManager<DataType>::setPresort(bool presort) {
         _data.setPresort(presort);
     }

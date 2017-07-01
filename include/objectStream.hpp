@@ -51,7 +51,7 @@ namespace ch {
     /*
      * Implementation of object output stream
      */
-    template <class DataType>
+    template <typename DataType>
     class ObjectOutputStream: public ObjectStream {
         protected:
             void sendStopSignal(void);
@@ -85,7 +85,7 @@ namespace ch {
     /*
      * Implementation of object input stream
      */
-    template <class DataType>
+    template <typename DataType>
     class ObjectInputStream: public ObjectStream {
         public:
             // From value
@@ -131,26 +131,26 @@ namespace ch {
         return _sockfd != INVALID_SOCKET;
     }
 
-    template <class DataType>
+    template <typename DataType>
     inline void ObjectOutputStream<DataType>::sendStopSignal(void) {
         const id_t id_invalid = ID_INVALID;
         psend(_sockfd, static_cast<const void *>(&id_invalid), sizeof(id_t));
     }
 
     // Default constructor
-    template <class DataType>
+    template <typename DataType>
     ObjectOutputStream<DataType>::ObjectOutputStream() {}
 
     // Move constructor
-    template <class DataType>
+    template <typename DataType>
     ObjectOutputStream<DataType>::ObjectOutputStream(ObjectOutputStream<DataType> && o): ObjectStream{std::move(o)} {}
 
     // Destructor
-    template <class DataType>
+    template <typename DataType>
     ObjectOutputStream<DataType>::~ObjectOutputStream() {close();}
 
     // Connect to an given ip at given port
-    template <class DataType>
+    template <typename DataType>
     bool ObjectOutputStream<DataType>::open(const std::string & ip, unsigned short port) {
         ::close(_sockfd);
         _sockfd = INVALID_SOCKET;
@@ -158,7 +158,7 @@ namespace ch {
     }
 
     // Send signal that causes ObjectInputStream::recv return nullptr
-    template <class DataType>
+    template <typename DataType>
     void ObjectOutputStream<DataType>::stop() {
         if (isValid()) {
             sendStopSignal();
@@ -167,7 +167,7 @@ namespace ch {
 
     // Send signal that causes ObjectInputStream::recv return nullptr
     // close the connection as well
-    template <class DataType>
+    template <typename DataType>
     void ObjectOutputStream<DataType>::close(void) {
         if (isValid()) {
             sendStopSignal();
@@ -177,7 +177,7 @@ namespace ch {
     }
 
     // Send data through socket
-    template <class DataType>
+    template <typename DataType>
     bool ObjectOutputStream<DataType>::send(const DataType & v) {
         DSS("ObjectOutputStream: Sending " << v);
         id_t id = DataType::getId();
@@ -190,21 +190,21 @@ namespace ch {
     }
 
     // From value
-    template <class DataType>
+    template <typename DataType>
     ObjectInputStream<DataType>::ObjectInputStream(int sockfd): ObjectStream{sockfd} {}
 
     // Move constructor
-    template <class DataType>
+    template <typename DataType>
     ObjectInputStream<DataType>::ObjectInputStream(ObjectInputStream<DataType> && o): ObjectStream{std::move(o)} {}
 
     // Destructor
-    template <class DataType>
+    template <typename DataType>
     ObjectInputStream<DataType>::~ObjectInputStream() {
         close();
     }
 
     // Close the connection
-    template <class DataType>
+    template <typename DataType>
     void ObjectInputStream<DataType>::close(void) {
         if (isValid()) {
             ::close(_sockfd);
@@ -214,7 +214,7 @@ namespace ch {
 
     // Receive data, return pointer to data if success
     // return nullptr if failed
-    template <class DataType>
+    template <typename DataType>
     DataType * ObjectInputStream<DataType>::recv(void) {
         id_t id = ID_INVALID;
         if (precv(_sockfd, static_cast<void *>(&id), sizeof(id_t))) {

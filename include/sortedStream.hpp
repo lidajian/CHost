@@ -22,7 +22,7 @@ namespace ch {
     /*
      * pairComparator: comparator template for pair
      */
-    template <class DataType_1, class DataType_2, bool greater>
+    template <typename DataType_1, typename DataType_2, bool greater>
     struct pairComparator {
         bool operator()(const std::pair<DataType_1, DataType_2> & l, const std::pair<DataType_1, DataType_2> & r) {
             if (greater) {
@@ -33,7 +33,7 @@ namespace ch {
         }
     };
 
-    template <class DataType>
+    template <typename DataType>
     class SortedStream {
         protected:
             // Files it manages
@@ -49,7 +49,7 @@ namespace ch {
             SortedStream(std::vector<std::string> && files);
 
             // Constructor with iterator
-            template <class FileIter_T>
+            template <typename FileIter_T>
             SortedStream(const FileIter_T & begin, const FileIter_T & end);
 
             // Copy constructor (deleted)
@@ -73,7 +73,7 @@ namespace ch {
     ********************************************/
 
     // Constructor
-    template <class DataType>
+    template <typename DataType>
     SortedStream<DataType>::SortedStream(std::vector<std::string> && files): _files{std::move(files)} {
         files.clear();
         DataType temp;
@@ -86,8 +86,8 @@ namespace ch {
     }
 
     // Constructor with iterator
-    template <class DataType>
-    template <class FileIter_T>
+    template <typename DataType>
+    template <typename FileIter_T>
     SortedStream<DataType>::SortedStream(const FileIter_T & begin, const FileIter_T & end) {
         DataType temp;
         FileIter_T it = begin;
@@ -102,14 +102,14 @@ namespace ch {
     }
 
     // Move constructor
-    template <class DataType>
+    template <typename DataType>
     SortedStream<DataType>::SortedStream(SortedStream<DataType> && o): _files{std::move(o._files)} {
         o._files.clear();
         o.minHeap.swap(minHeap);
     }
 
     // Destructor
-    template <class DataType>
+    template <typename DataType>
     SortedStream<DataType>::~SortedStream() {
 
         while (!minHeap.empty()) {
@@ -121,13 +121,13 @@ namespace ch {
     }
 
     // True if the stream has data
-    template <class DataType>
+    template <typename DataType>
     inline bool SortedStream<DataType>::isValid() const {
         return (minHeap.size() != 0);
     }
 
     // Get data from stream
-    template <class DataType>
+    template <typename DataType>
     bool SortedStream<DataType>::get(DataType & ret) {
         if (!isValid()) {
             return false;
