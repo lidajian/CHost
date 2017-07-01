@@ -20,7 +20,7 @@ namespace ch {
      */
     struct context_t {
         const ipconfig_t & _ips;
-        ch::SourceManager * _source;
+        ch::SourceManager & _source;
         const std::string & _outputFilePath;
         const std::string & _workingDir;
         const bool _isServer;
@@ -29,7 +29,7 @@ namespace ch {
                            ch::SourceManager & source,
                            const std::string & outputFilePath,
                            const std::string & workingDir,
-                           const bool isServer = false): _ips{ips}, _source{&source}, _outputFilePath{outputFilePath}, _workingDir{workingDir}, _isServer{isServer} {}
+                           const bool isServer = false): _ips(ips), _source(source), _outputFilePath(outputFilePath), _workingDir(workingDir), _isServer(isServer) {}
     };
 
     // Job function type
@@ -76,7 +76,7 @@ namespace ch {
         }
 
         // Map
-        while (context._source->poll(polled)) {
+        while (context._source.poll(polled)) {
             mapper(polled, stm);
         }
         stm.stopSend();
@@ -133,7 +133,7 @@ namespace ch {
         }
 
         // Map
-        while (context._source->poll(polled)) {
+        while (context._source.poll(polled)) {
             mapper(polled, stm_mapper);
         }
         stm_mapper.finalizeSend();
