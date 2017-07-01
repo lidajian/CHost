@@ -133,7 +133,7 @@ namespace ch {
 #elif defined (__CH_EPOLL__)
 
             // Register events
-            int ep = epoll_create();
+            int ep = epoll_create1(0);
 
             if (ep < 0) {
                 return;
