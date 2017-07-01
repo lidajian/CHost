@@ -8,7 +8,7 @@ SRC_DIR = ./src
 CXX = g++
 CFLAGS += -D _SUGGEST -D _ERROR -Wall -std=c++11 -I$(INC_DIR)
 LDFLAGS += -lpthread -ldl
-OBJS = sourceManager utils splitter
+OBJS = sourceManager utils splitter threadPool
 OBJS_PATHS = $(foreach OBJ, $(OBJS), $(TEMP_PREFIX)/$(OBJ).o)
 EXECS = chserver chrun
 EXECS_PATHS = $(foreach EXEC, $(EXECS), $(BUILD_PREFIX)/$(EXEC))

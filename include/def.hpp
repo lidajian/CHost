@@ -90,6 +90,7 @@ P(tss.str().c_str())
 #define MAX_CONNECTION_ATTEMPT 15
 #define BUFFER_SIZE 1024
 #define DATA_BLOCK_SIZE 65536
+#define THREAD_POOL_SIZE 4
 
 // Enable epoll on Linux
 #ifdef __gnu_linux__

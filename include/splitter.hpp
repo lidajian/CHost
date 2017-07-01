@@ -38,6 +38,12 @@ namespace ch {
             // Move constructor (deleted)
             Splitter(Splitter &&) = delete;
 
+            // Copy assignment (deleted)
+            Splitter & operator = (const Splitter &) = delete;
+
+            // Move assignment (deleted)
+            Splitter & operator = (Splitter &&) = delete;
+
             // Destructor
             ~Splitter();
 

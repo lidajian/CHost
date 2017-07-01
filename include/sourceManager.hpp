@@ -8,8 +8,26 @@
 #include <thread> // thread
 #include <vector> // vector
 #include <string> // string
+#include <atomic> // atomic_uint
+#include <unordered_map> // unordered_map
+
 #include "splitter.hpp" // Splitter
 #include "utils.hpp" // sconnect, invokeWorker
+#include "threadPool.hpp" // ThreadPool
+
+// Include header for epoll
+#if defined (__CH_EPOLL__)
+
+#include <sys/epoll.h>
+
+// Include header for kqueue
+#elif defined (__CH_KQUEUE__)
+
+#include <sys/types.h>
+#include <sys/event.h>
+#include <sys/time.h>
+
+#endif
 
 namespace ch {
 
@@ -36,17 +54,17 @@ namespace ch {
             // Cache of job file
             std::string _jobFileContent;
 
-            // Distribution threads
-            std::vector<std::thread> threads;
+            // File descriptor of connections
+            std::vector<int> connections;
+
+            // Distribution thread
+            std::thread * dthread;
 
             // Results from workers
             std::vector<bool> workerIsSuccess;
 
             // Rearrange ipconfig to create configure files for other machines
             static void rearrangeIPs(const ipconfig_t & ips, std::string & file, const size_t indexToHead);
-
-            // Distribution thread
-            static void distributionThread(int i, const ipconfig_t & ips, const unsigned short port, SourceManagerMaster * source);
 
         public:
 
@@ -58,6 +76,18 @@ namespace ch {
 
             // Move constructor (deleted)
             SourceManagerMaster(SourceManagerMaster &&) = delete;
+
+            // Copy assignment (deleted)
+            SourceManagerMaster & operator = (const SourceManagerMaster &) = delete;
+
+            // Move assignment (deleted)
+            SourceManagerMaster & operator = (SourceManagerMaster &&) = delete;
+
+            // Connect to workers and deliver files
+            bool connectAndDeliver(const ipconfig_t & ips, unsigned short port = SERVER_PORT);
+
+            // Start distribution thread
+            void startDistributionThread();
 
             // Start distribution threads
             void startFileDistributionThreads(const ipconfig_t & ips, unsigned short port = SERVER_PORT);
@@ -93,6 +123,12 @@ namespace ch {
 
             // Move Constructor
             SourceManagerWorker(SourceManagerWorker && o);
+
+            // Copy assignment
+            SourceManagerWorker & operator = (const SourceManagerWorker & o);
+
+            // Move assignment
+            SourceManagerWorker & operator = (SourceManagerWorker && o);
 
             // Receive resource files
             // 1. Configuration file

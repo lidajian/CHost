@@ -58,6 +58,12 @@ namespace ch {
             // Move constructor
             LocalFileManager(LocalFileManager<DataType> && o);
 
+            // Copy assignment (deleted)
+            LocalFileManager<DataType> & operator = (const LocalFileManager<DataType> &) = delete;
+
+            // Move assignment
+            LocalFileManager<DataType> & operator = (LocalFileManager<DataType> && o);
+
             // Destructor
             ~LocalFileManager();
 
@@ -195,6 +201,15 @@ namespace ch {
     template <typename DataType>
     LocalFileManager<DataType>::LocalFileManager(LocalFileManager<DataType> && o): dumpFileDir{o.dumpFileDir}, dumpFiles{std::move(o.dumpFiles)} {
         o.dumpFiles.clear();
+    }
+
+    // Move assignment
+    template <typename DataType>
+    LocalFileManager<DataType> & LocalFileManager<DataType>::operator = (LocalFileManager<DataType> && o) {
+        dumpFileDir = std::move(o.dumpFileDir);
+        dumpFiles = std::move(o.dumpFiles);
+        o.dumpFiles.clear();
+        return *this;
     }
 
     // Destructor

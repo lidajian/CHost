@@ -321,8 +321,7 @@ namespace ch {
     // Read ipconfig from configureFile
     bool readIPs(const std::string & configureFile, ipconfig_t & ips) {
         ips.clear();
-        std::ifstream in;
-        in.open(configureFile);
+        std::ifstream in{configureFile};
         if (!in) {
             D("(readIPs) Cannot open configuration file.");
             return false;

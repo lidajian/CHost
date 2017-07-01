@@ -7,8 +7,8 @@
 
 // Index IPs in configuration file
 bool createTargetConfigurationFile (const std::string & confFilePath, const std::string & targetConfFilePath) {
-    std::ifstream cis(confFilePath);
-    std::ofstream tcis(targetConfFilePath);
+    std::ifstream cis{confFilePath};
+    std::ofstream tcis{targetConfFilePath};
     if (cis.fail()) {
         E("Cannot open configuration file.");
         I("Check existence of the given configuration file.");
@@ -39,7 +39,7 @@ bool parseArgs(const int argc, char * const* argv, std::string & confFilePath, s
     bool hasJ = false;
 
     char * current_dir = getcwd(nullptr, 0);
-    std::string current_dir_str(current_dir);
+    std::string current_dir_str{current_dir};
     current_dir_str.push_back('/');
     free(current_dir);
 

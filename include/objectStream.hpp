@@ -38,6 +38,12 @@ namespace ch {
             // Move constructor
             ObjectStream(ObjectStream && o);
 
+            // Copy assignment (deleted)
+            ObjectStream & operator = (const ObjectStream &) = delete;
+
+            // Move assignment
+            ObjectStream & operator = (ObjectStream && o);
+
             // Virtual Destructor
             virtual ~ObjectStream();
 
@@ -64,6 +70,12 @@ namespace ch {
 
             // Move constructor
             ObjectOutputStream(ObjectOutputStream<DataType> && o);
+
+            // Copy assignment (deleted)
+            ObjectOutputStream<DataType> & operator = (const ObjectOutputStream<DataType> &) = delete;
+
+            // Move assignment
+            ObjectOutputStream<DataType> & operator = (ObjectOutputStream<DataType> && o);
 
             // Destructor
             ~ObjectOutputStream();
@@ -97,6 +109,12 @@ namespace ch {
             // Move constructor
             ObjectInputStream(ObjectInputStream<DataType> && o);
 
+            // Copy assignment (deleted)
+            ObjectInputStream<DataType> & operator = (const ObjectInputStream<DataType> &) = delete;
+
+            // Move assignment
+            ObjectInputStream<DataType> & operator = (ObjectInputStream<DataType> && o);
+
             // Destructor
             ~ObjectInputStream();
 
@@ -123,6 +141,13 @@ namespace ch {
         o._sockfd = INVALID_SOCKET;
     }
 
+    // Move assignment
+    ObjectStream & ObjectStream::operator = (ObjectStream && o) {
+        _sockfd = o._sockfd;
+        o._sockfd = INVALID_SOCKET;
+        return *this;
+    }
+
     // Virtual Destructor
     ObjectStream::~ObjectStream() {}
 
@@ -144,6 +169,14 @@ namespace ch {
     // Move constructor
     template <typename DataType>
     ObjectOutputStream<DataType>::ObjectOutputStream(ObjectOutputStream<DataType> && o): ObjectStream{std::move(o)} {}
+
+    // Move assignment
+    template <typename DataType>
+    ObjectOutputStream<DataType> & ObjectOutputStream<DataType>::operator = (ObjectOutputStream<DataType> && o) {
+        _sockfd = o._sockfd;
+        o._sockfd = INVALID_SOCKET;
+        return *this;
+    }
 
     // Destructor
     template <typename DataType>
@@ -196,6 +229,14 @@ namespace ch {
     // Move constructor
     template <typename DataType>
     ObjectInputStream<DataType>::ObjectInputStream(ObjectInputStream<DataType> && o): ObjectStream{std::move(o)} {}
+
+    // Move assignment
+    template <typename DataType>
+    ObjectInputStream<DataType> & ObjectInputStream<DataType>::operator = (ObjectInputStream<DataType> && o) {
+        _sockfd = o._sockfd;
+        o._sockfd = INVALID_SOCKET;
+        return *this;
+    }
 
     // Destructor
     template <typename DataType>

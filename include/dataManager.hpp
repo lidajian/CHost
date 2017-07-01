@@ -52,6 +52,12 @@ namespace ch {
             // Move constructor (deleted)
             DataManager(DataManager<DataType> && ) = delete;
 
+            // Copy assignment (deleted)
+            DataManager<DataType> & operator = (const DataManager<DataType> &) = delete;
+
+            // Move assignment (deleted)
+            DataManager<DataType> & operator = (DataManager<DataType> &&) = delete;
+
             // Destructor
             ~DataManager();
 

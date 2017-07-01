@@ -11,7 +11,7 @@
 
 // TODO fault tolerence (error process)
 // TODO multi-thread
-// TODO epoll/kqueue
+// TODO Murmur hash
 std::string confFilePath;
 std::string workingDir;
 
@@ -44,7 +44,7 @@ bool asWorker(const int sockfd) {
 
     puts("Running as worker.");
 
-    ch::SourceManagerWorker source(sockfd);
+    ch::SourceManagerWorker source{sockfd};
 
     if (source.isValid()) {
         std::string jobFilePath = workingDir + JOB_FILE;
@@ -108,7 +108,7 @@ bool asMaster(int sockfd) {
         return false;
     }
 
-    ch::SourceManagerMaster source(dataFilePath.c_str(), jobFilePath);
+    ch::SourceManagerMaster source{dataFilePath.c_str(), jobFilePath};
 
     if (source.isValid()) {
 
@@ -181,7 +181,7 @@ int main(int argc, char ** argv) {
         while (1) {
             P("Accepting request.");
             int sockfd = accept(serverfd, reinterpret_cast<struct sockaddr *>(&remote), &s_size);
-            std::thread serve_thread(serve, sockfd);
+            std::thread serve_thread{serve, sockfd};
             serve_thread.detach();
         }
     } else {

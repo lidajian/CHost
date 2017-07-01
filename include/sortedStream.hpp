@@ -58,6 +58,12 @@ namespace ch {
             // Move constructor
             SortedStream(SortedStream<DataType> && o);
 
+            // Copy assignment (deleted)
+            SortedStream<DataType> & operator = (const SortedStream<DataType> &) = delete;
+
+            // Move assignment
+            SortedStream<DataType> & operator = (SortedStream<DataType> && o);
+
             // Destructor
             ~SortedStream();
 
@@ -106,6 +112,15 @@ namespace ch {
     SortedStream<DataType>::SortedStream(SortedStream<DataType> && o): _files{std::move(o._files)} {
         o._files.clear();
         o.minHeap.swap(minHeap);
+    }
+
+    // Move assignment
+    template <typename DataType>
+    SortedStream<DataType> & SortedStream<DataType>::operator = (SortedStream<DataType> && o) {
+        _files = std::move(o._files);
+        o._files.clear();
+        o.minHeap.swap(minHeap);
+        return *this;
     }
 
     // Destructor

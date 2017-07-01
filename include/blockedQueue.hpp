@@ -21,11 +21,20 @@ namespace ch {
             std::mutex lock;
         public:
 
+            // Constructor
+            BlockedQueue();
+
             // Copy constructor (deleted)
             BlockedQueue(const BlockedQueue<T> &) = delete;
 
             // Move constructor (deleted)
             BlockedQueue(BlockedQueue<T> &&) = delete;
+
+            // Copy assignment (deleted)
+            BlockedQueue<T> & operator = (const BlockedQueue<T> &) = delete;
+
+            // Move assignment (deleted)
+            BlockedQueue<T> & operator = (BlockedQueue<T> &&) = delete;
 
             // Destructor
             ~BlockedQueue();
@@ -50,11 +59,13 @@ namespace ch {
      ************ Implementation ****************
     ********************************************/
 
+    // Constructor
+    template <typename T>
+    BlockedQueue<T>::BlockedQueue() {}
+
     // Destructor
     template <typename T>
-    BlockedQueue<T>::~BlockedQueue() {
-        clear();
-    }
+    BlockedQueue<T>::~BlockedQueue() {}
 
     // Copy push
     template <typename T>

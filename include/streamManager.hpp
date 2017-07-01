@@ -75,6 +75,18 @@ namespace ch {
             // Constructor: given vector of IP configuration
             StreamManager(const ipconfig_t & ips, const std::string & dir, size_t maxDataSize = DEFAULT_MAX_DATA_SIZE, bool presort = true);
 
+            // Copy constructor (deleted)
+            StreamManager(const StreamManager<DataType> &) = delete;
+
+            // Move constructor (deleted)
+            StreamManager(StreamManager<DataType> &&) = delete;
+
+            // Copy assignment (deleted)
+            StreamManager<DataType> & operator = (const StreamManager<DataType> &) = delete;
+
+            // Move assignment (deleted)
+            StreamManager<DataType> & operator = (StreamManager<DataType> &&) = delete;
+
             // Destructor
             // Send stop signal to other machines and block until receive threads end
             // Close and clear all streams

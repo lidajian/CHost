@@ -39,6 +39,12 @@ namespace ch {
             // Move constructor
             UnsortedStream(UnsortedStream<DataType> && o);
 
+            // Copy assignment (deleted)
+            UnsortedStream<DataType> & operator = (const UnsortedStream<DataType> &) = delete;
+
+            // Move assignment
+            UnsortedStream<DataType> & operator = (UnsortedStream<DataType> && o);
+
             // Destructor
             ~UnsortedStream();
 
@@ -67,6 +73,15 @@ namespace ch {
     // Move constructor
     template <typename DataType>
     UnsortedStream<DataType>::UnsortedStream(UnsortedStream<DataType> && o): _files{std::move(o._files)}, i{o.i}, is{std::move(o.is)} {}
+
+    // Move assignment
+    template <typename DataType>
+    UnsortedStream<DataType> & UnsortedStream<DataType>::operator = (UnsortedStream<DataType> && o) {
+        _files = std::move(o._files);
+        i = o.i;
+        is = std::move(o.is);
+        return *this;
+    }
 
     // Destructor
     template <typename DataType>
