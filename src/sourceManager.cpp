@@ -23,6 +23,15 @@ namespace ch {
         }
     }
 
+    // Destructor
+    SourceManagerMaster::~SourceManagerMaster() {
+        for (size_t i = 1, l = connections.size(); i < l; ++i) {
+            if (connections[i] >= 0) {
+                close(connections[i]);
+            }
+        }
+    }
+
     // Connect to workers and deliver files
     bool SourceManagerMaster::connectAndDeliver(const ipconfig_t & ips, unsigned short port) {
         size_t l = ips.size();
@@ -75,7 +84,14 @@ namespace ch {
             threadPool.stop(); // wait until all connection thread ends
             for (size_t i = 1; i < l; ++i) {
                 if (connections[i] < 0) {
-                    return false; // TODO inform active workers
+                    // Clean up all connections
+                    for (i = 1; i < l; ++i) {
+                        if (connections[i] >= 0) {
+                            close(connections[i]);
+                        }
+                    }
+                    connections.clear();
+                    return false;
                 }
             }
         }
@@ -120,7 +136,8 @@ namespace ch {
                 fdToIndex[connections[i]] = i;
             }
             if (kevent(kq, events, nConnections, nullptr, 0, nullptr) < 0) {
-                return; // TODO fail
+                close(kq);
+                return;
             }
 
             // Handle events
@@ -143,7 +160,10 @@ namespace ch {
             for (size_t i = 1; i < l; ++i) {
                 events[i - 1].events = EPOLLIN;
                 events[i - 1].data.fd = connections[i];
-                epoll_ctl(ep, EPOLL_CTL_ADD, connections[i], events); // TODO fail
+                if (epoll_ctl(ep, EPOLL_CTL_ADD, connections[i], events) < 0) {
+                    close(ep);
+                    return;
+                }
                 repliedEOF[connections[i]] = false;
                 fdToIndex[connections[i]] = i;
             }
@@ -186,8 +206,8 @@ namespace ch {
                                         std::string split;
                                         if (!(this->splitter.next(split))) { // end service by server
                                             ssize_t endSize = INVALID;
-                                            psend(sockfd, static_cast<void *>(&endSize), sizeof(ssize_t));
                                             repliedEOF[sockfd] = true;
+                                            psend(sockfd, static_cast<void *>(&endSize), sizeof(ssize_t));
                                         } else if (!sendString(sockfd, split)) {
                                             E("(SourceManagerMaster) Failed to send split.");
                                             repliedEOF[sockfd] = true;
@@ -205,6 +225,7 @@ namespace ch {
                     }
                 }
             }
+            connections.clear();
 #if defined (__CH_KQUEUE__)
             close(kq);
 #elif defined (__CH_EPOLL__)
@@ -252,17 +273,6 @@ namespace ch {
             }
 #endif
         }};
-    }
-
-    // Start distribution threads
-    void SourceManagerMaster::startFileDistributionThreads(const ipconfig_t & ips, unsigned short port) {
-        if (!isValid()) {
-            D("(SourceManagerMaster) Cannot start distribution when data file is not opened.");
-            return;
-        }
-        if (connectAndDeliver(ips, port)) {
-            startDistributionThread();
-        }
     }
 
     // Block the current thread until all distribution threads terminate

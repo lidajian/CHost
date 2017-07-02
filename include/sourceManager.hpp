@@ -83,14 +83,14 @@ namespace ch {
             // Move assignment (deleted)
             SourceManagerMaster & operator = (SourceManagerMaster &&) = delete;
 
+            // Destructor
+            ~SourceManagerMaster();
+
             // Connect to workers and deliver files
             bool connectAndDeliver(const ipconfig_t & ips, unsigned short port = SERVER_PORT);
 
             // Start distribution thread
             void startDistributionThread();
-
-            // Start distribution threads
-            void startFileDistributionThreads(const ipconfig_t & ips, unsigned short port = SERVER_PORT);
 
             // Block the current thread until all distribution threads terminate
             void blockTillDistributionThreadsEnd();

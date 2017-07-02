@@ -112,7 +112,12 @@ bool asMaster(int sockfd) {
 
     if (source.isValid()) {
 
-        source.startFileDistributionThreads(ips);
+        if (!source.connectAndDeliver(ips)) {
+            E("Fail to connect to workers.");
+            return false;
+        }
+
+        source.startDistributionThread();
 
         // do job
 
