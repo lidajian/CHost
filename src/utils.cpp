@@ -213,8 +213,7 @@ namespace ch {
     bool receiveFile(const int sockfd, const char * file_path) {
         char buffer[BUFFER_SIZE];
         if (fileExist(file_path)) {
-            E("(receiveFile) File exists.");
-            return false;
+            D("(receiveFile) File exists.");
         }
         FILE * fd = fopen(file_path, "w");
         if (fd == NULL) {

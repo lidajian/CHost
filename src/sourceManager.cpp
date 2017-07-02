@@ -141,9 +141,9 @@ namespace ch {
 
             struct epoll_event events[nConnections];
             for (size_t i = 1; i < l; ++i) {
-                events[0].events = EPOLLIN;
-                events[0].data.fd = connections[i];
-                epoll_ctl(ep, EPOLL_CTL_ADD, connections[0], events); // TODO fail
+                events[i - 1].events = EPOLLIN;
+                events[i - 1].data.fd = connections[i];
+                epoll_ctl(ep, EPOLL_CTL_ADD, connections[i], events); // TODO fail
                 repliedEOF[connections[i]] = false;
                 fdToIndex[connections[i]] = i;
             }
