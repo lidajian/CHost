@@ -72,6 +72,7 @@ P(tss.str().c_str())
 
 // Macro functions
 #define MIN_VAL(a, b) ((a < b) ? a : b)
+#define MAX_VAL(a, b) ((a > b) ? a : b)
 #define IS_ESCAPER(c) (c == '\r' || c == '\n')
 #define LENGTH_CONST_CHAR_ARRAY(s) (sizeof(s) - 1) // exclude '\0'
 
@@ -105,6 +106,25 @@ P(tss.str().c_str())
 // Enable kqueue on FreeBSD
 #ifdef __FreeBSD__
 #define __CH_KQUEUE__
+#endif
+
+// Include header for epoll
+#if defined (__CH_EPOLL__)
+
+#include <sys/epoll.h>
+
+// Include header for kqueue
+#elif defined (__CH_KQUEUE__)
+
+#include <sys/types.h>
+#include <sys/event.h>
+#include <sys/time.h>
+
+// Include header for select
+#else
+
+#include <sys/select.h>
+
 #endif
 
 typedef std::vector<std::pair<size_t, std::string> > ipconfig_t;

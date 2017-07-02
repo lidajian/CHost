@@ -15,20 +15,6 @@
 #include "utils.hpp" // sconnect, invokeWorker
 #include "threadPool.hpp" // ThreadPool
 
-// Include header for epoll
-#if defined (__CH_EPOLL__)
-
-#include <sys/epoll.h>
-
-// Include header for kqueue
-#elif defined (__CH_KQUEUE__)
-
-#include <sys/types.h>
-#include <sys/event.h>
-#include <sys/time.h>
-
-#endif
-
 namespace ch {
 
     class SourceManager {

@@ -142,11 +142,56 @@ namespace ch {
                 return;
             }
 
-#if defined (__CH_KQUEUE__) || defined (__CH_EPOLL__)
+            if (l <= THREAD_POOL_SIZE) {
+                // Less than/equals to THREAD_POOL_SIZE threads, start threads directly
+                std::vector<std::thread> dthreads;
+
+                for (size_t i = 1; i < l; ++i) {
+                    int & sockfd = this->connections[i];
+                    dthreads.emplace_back([i, &sockfd, this](){
+
+                        // provide poll service
+                        char receivedChar;
+                        std::string split;
+                        ssize_t endSize = INVALID;
+                        while (precv(sockfd, static_cast<void *>(&receivedChar), sizeof(char))) {
+                            if (receivedChar == CALL_POLL) {
+                                if (!(this->splitter.next(split))) { // end service by server
+                                    psend(sockfd, static_cast<void *>(&endSize), sizeof(ssize_t));
+                                    break;
+                                }
+                                if (!sendString(sockfd, split)) {
+                                    E("(SourceManagerMaster) Failed to send split.");
+                                    break;
+                                }
+                                split.clear();
+                            }
+                        }
+
+                        if (!precv(sockfd, static_cast<void *>(&receivedChar), sizeof(char))) {
+                            E("(SourceManagerMaster) No response from worker.");
+                            close(sockfd);
+                            return;
+                        }
+
+                        this->workerIsSuccess[i] = (receivedChar == RES_SUCCESS);
+                        close(sockfd);
+                    });
+                }
+
+                for (std::thread & thrd: dthreads) {
+                    thrd.join();
+                }
+                return;
+            }
+
+            /*
+             * More than THREAD_POOL_SIZE threads: Event loop + thread pool
+             */
 
             size_t nConnections = l - 1;
             int nEvents;
-            ThreadPool threadPool{MIN_VAL(THREAD_POOL_SIZE, nConnections)};
+            ThreadPool threadPool{THREAD_POOL_SIZE};
 
             std::unordered_map<int, bool> repliedEOF;
             std::unordered_map<int, int> fdToIndex;
@@ -206,6 +251,22 @@ namespace ch {
                 if (nEvents > 0) {
                     for (int i = 0; i < nEvents; ++i) {
                         int sockfd = events[i].data.fd;
+#else
+            // Register events
+            fd_set fdset;
+            int fdmax = 0;
+            for (size_t i = 1; i < l; ++i) {
+                fdmax = MAX_VAL(fdmax, connections[i]);
+                FD_SET(connections[i], &fdset);
+                repliedEOF[connections[i]] = false;
+                fdToIndex[connections[i]] = i;
+            }
+
+            // Handle events
+            while (endedConnection < nConnections) {
+                int sockfd = select(fdmax + 1, &fdset, nullptr, nullptr, nullptr);
+                if (sockfd > 0) {
+                    if (FD_ISSET(sockfd, &fdset)) {
 #endif
                         // It is guaranteed that only one thread for a sockfd runs at the same time
                         if (repliedEOF[sockfd]) {
@@ -262,47 +323,6 @@ namespace ch {
             close(kq);
 #elif defined (__CH_EPOLL__)
             close(ep);
-#endif
-
-#else
-            std::vector<std::thread> dthreads;
-
-            for (size_t i = 1; i < l; ++i) {
-                int & sockfd = this->connections[i];
-                dthreads.emplace_back([i, &sockfd, this](){
-
-                    // provide poll service
-                    char receivedChar;
-                    std::string split;
-                    ssize_t endSize = INVALID;
-                    while (precv(sockfd, static_cast<void *>(&receivedChar), sizeof(char))) {
-                        if (receivedChar == CALL_POLL) {
-                            if (!(this->splitter.next(split))) { // end service by server
-                                psend(sockfd, static_cast<void *>(&endSize), sizeof(ssize_t));
-                                break;
-                            }
-                            if (!sendString(sockfd, split)) {
-                                E("(SourceManagerMaster) Failed to send split.");
-                                break;
-                            }
-                            split.clear();
-                        }
-                    }
-
-                    if (!precv(sockfd, static_cast<void *>(&receivedChar), sizeof(char))) {
-                        E("(SourceManagerMaster) No response from worker.");
-                        close(sockfd);
-                        return;
-                    }
-
-                    this->workerIsSuccess[i] = (receivedChar == RES_SUCCESS);
-                    close(sockfd);
-                });
-            }
-
-            for (std::thread & thrd: dthreads) {
-                thrd.join();
-            }
 #endif
         }};
     }
