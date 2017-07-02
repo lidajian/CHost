@@ -54,7 +54,17 @@ namespace ch {
             const size_t totalLength = rv + bufferedLength;
             size_t cursor;
             char c;
-            for (cursor = totalLength - 1; cursor >= 0; --cursor) {
+            for (cursor = totalLength - 1; cursor > 0; --cursor) {
+                c = buffer[cursor];
+                if (IS_ESCAPER(c)) {
+                    int returnLength = cursor + 1;
+                    res.append(buffer, returnLength);
+                    bufferedLength = totalLength - returnLength;
+                    memmove(static_cast<void *>(buffer), static_cast<void *>(buffer + returnLength), bufferedLength);
+                    return true;
+                }
+            }
+            if (cursor == 0) {
                 c = buffer[cursor];
                 if (IS_ESCAPER(c)) {
                     int returnLength = cursor + 1;
