@@ -10,6 +10,7 @@ OBJS = sourceManager utils splitter threadPool
 OBJS_PATHS = $(foreach OBJ, $(OBJS), $(TEMP_PREFIX)/$(OBJ).o)
 TESTS = streamManager type threadPool
 EXECS = $(foreach TEST, $(TESTS), test_$(TEST))
+EXECS_PATHS = $(foreach EXEC, $(EXECS), $(BUILD_PREFIX)/$(EXEC))
 
 all: build $(OBJS) $(EXECS)
 
@@ -26,6 +27,6 @@ build:
 
 .PHONY: clean
 clean:
-	rm -rf $(EXECS) $(OBJS_PATHS)
+	rm -rf $(EXECS_PATHS) $(OBJS_PATHS)
 	@(rmdir $(TEMP_PREFIX) 2> /dev/null; exit 0)
 	@(rmdir $(BUILD_PREFIX) 2> /dev/null; exit 0)
