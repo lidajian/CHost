@@ -107,6 +107,38 @@ namespace ch {
         dthread = new std::thread{[this, l](){
 
             if (l < 2) {
+                // No worker
+                return;
+            }
+
+            if (l == 2) {
+                // Only one worker, this thread servers as distribution threads
+                int & sockfd = this->connections[1];
+                char receivedChar;
+                std::string split;
+                ssize_t endSize = INVALID;
+                while (precv(sockfd, static_cast<void *>(&receivedChar), sizeof(char))) {
+                    if (receivedChar == CALL_POLL) {
+                        if (!(this->splitter.next(split))) { // end service by server
+                            psend(sockfd, static_cast<void *>(&endSize), sizeof(ssize_t));
+                            break;
+                        }
+                        if (!sendString(sockfd, split)) {
+                            E("(SourceManagerMaster) Failed to send split.");
+                            break;
+                        }
+                        split.clear();
+                    }
+                }
+
+                if (!precv(sockfd, static_cast<void *>(&receivedChar), sizeof(char))) {
+                    E("(SourceManagerMaster) No response from worker.");
+                    close(sockfd);
+                    return;
+                }
+
+                this->workerIsSuccess[1] = (receivedChar == RES_SUCCESS);
+                close(sockfd);
                 return;
             }
 
