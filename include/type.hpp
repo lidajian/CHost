@@ -12,6 +12,7 @@
 
 #include "def.hpp"
 #include "utils.hpp"
+#include "murmur.hpp"
 
 namespace ch {
     const int PRIME = 31;
@@ -26,6 +27,9 @@ namespace ch {
             inline static id_t getId(void) {
                 return ID_INVALID;
             }
+
+            // Internal hash code for tuple
+            virtual int _hashCode(void) = 0;
 
             // Get hash code of the object
             virtual int hashCode(void) = 0;
@@ -79,8 +83,11 @@ namespace ch {
             ~Integer() {}
 
             // Virtual functions implementation
+            inline int _hashCode(void) {
+                return murmur2(value);
+            }
             int hashCode(void) {
-                return value;
+                return _hashCode();
             }
             std::string toString(void) const {
                 return std::to_string(value);
@@ -134,39 +141,42 @@ namespace ch {
 
     class String: public TypeBase {
         protected:
+            bool hashGot;
+
             int hash;
         public:
             std::string value;
 
             // Default constructor
-            String(): hash{INVALID} {}
+            String(): hashGot{false} {}
 
             // From value
-            String(const std::string & str): hash{INVALID}, value{str} {}
+            String(const std::string & str): hashGot{false}, value{str} {}
 
             // From rvalue
-            String(std::string && str): hash{INVALID}, value{std::move(str)} {}
+            String(std::string && str): hashGot{false}, value{std::move(str)} {}
 
             // Copy constructor
-            String(const String & str): hash{INVALID}, value{str.value} {}
+            String(const String & str): hashGot{str.hashGot}, hash{str.hash}, value{str.value} {}
 
             // Move constructor
-            String(String && str): hash{INVALID}, value{std::move(str.value)} {}
+            String(String && str): hashGot{str.hashGot}, hash{str.hash}, value{std::move(str.value)} {
+                str.hashGot = false;
+            }
 
             // Destructor
             ~String() {}
 
             // Virtual functions implementation
+            inline int _hashCode(void) {
+                return murmur2(value);
+            }
             int hashCode(void) {
-                int h = hash;
-                if (h == INVALID) {
-                    h = 0;
-                    for (char c: value) {
-                        h = h * PRIME + c;
-                    }
-                    hash = h;
+                if (!hashGot) {
+                    hash = _hashCode();
+                    hashGot = true;
                 }
-                return h;
+                return hash;
             }
             std::string toString(void) const {
                 return "\"" + value + "\"";
@@ -178,12 +188,12 @@ namespace ch {
                 return sendString(fd, value);
             }
             bool recv(int fd) {
-                hash = INVALID;
+                hashGot = false;
                 return receiveString(fd, value);
             }
             std::ifstream & read(std::ifstream & is) {
                 size_t l = 0;
-                hash = INVALID;
+                hashGot = false;
                 if (is.read(reinterpret_cast<char *>(&l), sizeof(size_t))) {
                     value.resize(l);
                     is.read(&value[0], l);
@@ -218,19 +228,19 @@ namespace ch {
                 return (value.compare(b.value) >= 0);
             }
             String & operator = (const String & str) {
-                hash = INVALID;
+                hashGot = false;
                 value = str.value;
                 return (*this);
             }
             String & operator += (const String & str) {
-                hash = INVALID;
+                hashGot = false;
                 value += str.value;
                 return (*this);
             }
 
             // Move assignment
             String & operator = (String && str) {
-                hash = INVALID;
+                hashGot = false;
                 value = std::move(str.value);
                 return (*this);
             }
@@ -261,14 +271,20 @@ namespace ch {
             ~Tuple() {}
 
             // Virtual functions implementation
+
+            // Called if it is in first field of a root tuple
+            // Hash that take all fields into account
+            inline int _hashCode(void) {
+                return first._hashCode() ^ second._hashCode();
+            }
             int hashCode(void) {
-                return first.hashCode();
+                return first._hashCode();
             }
             std::string toString() const {
                 return "(" + first.toString() + ", " + second.toString() + ")";
             }
             inline static id_t getId(void) {
-                return (DataType_1::getId() << 4) | DataType_2::getId();
+                return (DataType_1::getId() << 3) ^ DataType_2::getId();
             }
             bool send(int fd) const {
                 return first.send(fd) && second.send(fd);

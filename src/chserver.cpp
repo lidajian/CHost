@@ -11,7 +11,6 @@
 
 // TODO fault tolerence (error process)
 // TODO multi-thread
-// TODO Murmur hash
 std::string confFilePath;
 std::string workingDir;
 
