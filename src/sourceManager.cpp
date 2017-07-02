@@ -98,7 +98,7 @@ namespace ch {
 
             size_t nConnections = l - 1;
             int nEvents;
-            ThreadPool threadPool{MIN_VAL(THREAD_POOL_SIZE, nConnections)};
+            // ThreadPool threadPool{MIN_VAL(THREAD_POOL_SIZE, nConnections)};
 
             std::unordered_map<int, bool> repliedEOF;
             std::unordered_map<int, int> fdToIndex;
@@ -174,31 +174,31 @@ namespace ch {
                                 }
                             }
                         } else {
-                            threadPool.addTask([sockfd, &repliedEOF, &endedConnection, this](){
-
-                                // provide poll service
-                                char receivedChar;
-                                std::string split;
-                                if (precv(sockfd, static_cast<void *>(&receivedChar), sizeof(char))) {
-                                    if (receivedChar == CALL_POLL) {
-                                        if (!(this->splitter.next(split))) { // end service by server
-                                            ssize_t endSize = INVALID;
-                                            psend(sockfd, static_cast<void *>(&endSize), sizeof(ssize_t));
-                                            repliedEOF[sockfd] = true;
-                                            return; // Normal routine
-                                        }
-                                        if (!sendString(sockfd, split)) {
-                                            E("(SourceManagerMaster) Failed to send split.");
-                                        } else {
-                                            return; // Normal routine
-                                        }
-                                    }
-                                }
+                            // provide poll service
+                            char receivedChar;
+                            std::string split;
+                            if (!precv(sockfd, static_cast<void *>(&receivedChar), sizeof(char))) {
                                 repliedEOF[sockfd] = true;
                                 ++endedConnection;
                                 close(sockfd);
-
-                            });
+                            } else {
+                                if (receivedChar == CALL_POLL) {
+                                    if (!(this->splitter.next(split))) { // end service by server
+                                        ssize_t endSize = INVALID;
+                                        psend(sockfd, static_cast<void *>(&endSize), sizeof(ssize_t));
+                                        repliedEOF[sockfd] = true;
+                                    } else if (!sendString(sockfd, split)) {
+                                        E("(SourceManagerMaster) Failed to send split.");
+                                        repliedEOF[sockfd] = true;
+                                        ++endedConnection;
+                                        close(sockfd);
+                                    }
+                                } else {
+                                    repliedEOF[sockfd] = true;
+                                    ++endedConnection;
+                                    close(sockfd);
+                                }
+                            }
                         }
                     }
                 }
