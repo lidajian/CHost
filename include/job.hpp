@@ -84,28 +84,26 @@ namespace ch {
         // End of map
 
         SortedStream<MapperReducerOutputType> * sorted = stm.getSortedStream();
+        std::unique_ptr<SortedStream<MapperReducerOutputType> > _sorted{sorted};
 
+        stm.setPresort(false);
+        stm.startRecvThreads();
+
+        if (!stm.isReceiving()) { // Fail to start receive threads
+            E("(Job) StreamManager start receive threads failed. Fail to perform reduce on this machine.");
+            return false;
+        }
+
+        // Reduce
         if (sorted) {
-
-            std::unique_ptr<SortedStream<MapperReducerOutputType> > _sorted{sorted};
-
-            stm.setPresort(false);
-            stm.startRecvThreads();
-
-            if (!stm.isReceiving()) { // Fail to start receive threads
-                E("(Job) StreamManager start receive threads failed. Fail to perform reduce on this machine.");
-                return false;
-            }
-
-            // Reduce
             reducer(*sorted, stm);
-            stm.finalizeSend();
-            stm.blockTillRecvEnd();
-            // End of reduce
+        }
+        stm.finalizeSend();
+        stm.blockTillRecvEnd();
+        // End of reduce
 
-            if (context._isServer) {
-                return stm.pourToTextFile(context._outputFilePath.c_str());
-            }
+        if (context._isServer) {
+            return stm.pourToTextFile(context._outputFilePath.c_str());
         }
         return true;
     }
@@ -141,34 +139,32 @@ namespace ch {
         // End of map
 
         SortedStream<MapperOutputType> * sorted = stm_mapper.getSortedStream();
+        std::unique_ptr<SortedStream<MapperOutputType> > _sorted{sorted};
 
+        StreamManager<ReducerOutputType> stm_reducer{context._ips, context._workingDir, DEFAULT_MAX_DATA_SIZE, false};
+
+        if (!stm_reducer.isConnected()) { // Not connected
+            E("(Job) StreamManager connect failed. Fail to perform reduce on this machine.");
+            return false;
+        }
+
+        stm_reducer.startRecvThreads();
+
+        if (!stm_reducer.isReceiving()) { // Fail to start receive threads
+            E("(Job) StreamManager start receive threads failed. Fail to perform reduce on this machine.");
+            return false;
+        }
+
+        // Reduce
         if (sorted) {
-
-            std::unique_ptr<SortedStream<MapperOutputType> > _sorted{sorted};
-
-            StreamManager<ReducerOutputType> stm_reducer{context._ips, context._workingDir, DEFAULT_MAX_DATA_SIZE, false};
-
-            if (!stm_reducer.isConnected()) { // Not connected
-                E("(Job) StreamManager connect failed. Fail to perform reduce on this machine.");
-                return false;
-            }
-
-            stm_reducer.startRecvThreads();
-
-            if (!stm_reducer.isReceiving()) { // Fail to start receive threads
-                E("(Job) StreamManager start receive threads failed. Fail to perform reduce on this machine.");
-                return false;
-            }
-
-            // Reduce
             reducer(*sorted, stm_reducer);
-            stm_reducer.finalizeSend();
-            stm_reducer.blockTillRecvEnd();
-            // End of reduce
+        }
+        stm_reducer.finalizeSend();
+        stm_reducer.blockTillRecvEnd();
+        // End of reduce
 
-            if (context._isServer) {
-                return stm_reducer.pourToTextFile(context._outputFilePath.c_str());
-            }
+        if (context._isServer) {
+            return stm_reducer.pourToTextFile(context._outputFilePath.c_str());
         }
         return true;
     }
