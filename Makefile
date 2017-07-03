@@ -11,9 +11,8 @@ LDFLAGS += -lpthread -ldl
 OBJS = sourceManager utils splitter threadPool
 OBJS_PATHS = $(foreach OBJ, $(OBJS), $(TEMP_PREFIX)/$(OBJ).o)
 EXECS = chserver chrun
-EXECS_PATHS = $(foreach EXEC, $(EXECS), $(BUILD_PREFIX)/$(EXEC))
 
-all: build $(OBJS) $(EXECS) example clear_temp
+all: build_dir $(OBJS) $(EXECS)
 
 $(OBJS) : % : $(SRC_DIR)/%.cpp
 	$(CXX) $(CFLAGS) -c $^ -o $(TEMP_PREFIX)/$@.o
@@ -21,8 +20,8 @@ $(OBJS) : % : $(SRC_DIR)/%.cpp
 $(EXECS) : % : $(SRC_DIR)/%.cpp $(OBJS_PATHS) 
 	$(CXX) $(CFLAGS) $(LDFLAGS) -o $(BUILD_PREFIX)/$@ $^
 
-.PHONY: build
-build:
+.PHONY: build_dir
+build_dir:
 	mkdir -p $(TEMP_PREFIX)
 	mkdir -p $(BUILD_PREFIX)
 
@@ -34,14 +33,17 @@ example:
 test:
 	cd $(TEST_DIR) && make
 
-.PHONY: clear_temp
-clear_temp:
+.PHONY: clean_example
+clean_example:
+	cd $(EXAMPLES_DIR) && make clean
+
+.PHONY: clean_test
+clean_test:
+	cd $(TEST_DIR) && make clean
+
+.PHONY: clean_temp
+clean_temp:
 	rm -rf $(TEMP_PREFIX)
 
-.PHONY: clean
-clean:
-	rm -rf $(OBJS_PATHS) $(EXECS_PATHS)
-	rm -rf $(TEMP_PREFIX)
-	@(rmdir $(BUILD_PREFIX) 2> /dev/null; exit 0)
-	@(rmdir $(TEMP_PREFIX) 2> /dev/null; exit 0)
-	cd $(EXAMPLES_DIR) && make clean
+clean: clean_temp clean_example clean_test
+	rm -rf $(BUILD_PREFIX)
