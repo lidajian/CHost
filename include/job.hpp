@@ -96,6 +96,7 @@ namespace ch {
 
         // Reduce
         if (sorted) {
+            stm.setPartitioner(zeroPartitioner);
             reducer(*sorted, stm);
         }
         stm.finalizeSend();
@@ -157,6 +158,7 @@ namespace ch {
 
         // Reduce
         if (sorted) {
+            stm_reducer.setPartitioner(zeroPartitioner);
             reducer(*sorted, stm_reducer);
         }
         stm_reducer.finalizeSend();

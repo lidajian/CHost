@@ -51,6 +51,9 @@ namespace ch {
             // Data manager
             DataManager<DataType> _data;
 
+            // Partitioner
+            const Partitioner * _partitioner;
+
             // Server thread: accept connections
             static void serverThread(int serverfd, const ipconfig_t & ips, std::vector<ObjectInputStream<DataType> *> & istreams);
 
@@ -70,10 +73,10 @@ namespace ch {
             void init(const ipconfig_t & ips);
         public:
             // Constructor: given directory of configuration
-            StreamManager(const std::string & configureFile, const std::string & dir, size_t maxDataSize = DEFAULT_MAX_DATA_SIZE, bool presort = true);
+            StreamManager(const std::string & configureFile, const std::string & dir, size_t maxDataSize = DEFAULT_MAX_DATA_SIZE, bool presort = true, const Partitioner & partitioner = hashPartitioner);
 
             // Constructor: given vector of IP configuration
-            StreamManager(const ipconfig_t & ips, const std::string & dir, size_t maxDataSize = DEFAULT_MAX_DATA_SIZE, bool presort = true);
+            StreamManager(const ipconfig_t & ips, const std::string & dir, size_t maxDataSize = DEFAULT_MAX_DATA_SIZE, bool presort = true, const Partitioner & partitioner = hashPartitioner);
 
             // Copy constructor (deleted)
             StreamManager(const StreamManager<DataType> &) = delete;
@@ -113,7 +116,7 @@ namespace ch {
             void blockTillRecvEnd(void);
 
             // Push data to the specific machine (partitioned by partitioner)
-            bool push(DataType & v, const Partitioner & partitioner);
+            bool push(DataType & v);
 
             // Get sorted stream from data manager
             SortedStream<DataType> * getSortedStream (void);
@@ -123,6 +126,9 @@ namespace ch {
 
             // Set presort of data manager
             void setPresort(bool presort);
+
+            // Set partitioner
+            void setPartitioner(const Partitioner & partitioner);
     };
 
     /********************************************
@@ -346,7 +352,8 @@ namespace ch {
 
     // Constructor: given directory of configuration
     template <typename DataType>
-    StreamManager<DataType>::StreamManager(const std::string & configureFile, const std::string & dir, size_t maxDataSize, bool presort): connected{false}, _data{dir, maxDataSize, presort} {
+    StreamManager<DataType>::StreamManager(const std::string & configureFile, const std::string & dir, size_t maxDataSize, bool presort, const Partitioner & partitioner):
+        connected{false}, _data{dir, maxDataSize, presort}, _partitioner{&partitioner} {
         ipconfig_t ips;
         if (!readIPs(configureFile, ips)) {
             return;
@@ -361,7 +368,8 @@ namespace ch {
 
     // Constructor: given vector of IP configuration
     template <typename DataType>
-    StreamManager<DataType>::StreamManager(const ipconfig_t & ips, const std::string & dir, size_t maxDataSize, bool presort): clusterSize{ips.size()}, connected{false}, _data{dir, maxDataSize, presort} {
+    StreamManager<DataType>::StreamManager(const ipconfig_t & ips, const std::string & dir, size_t maxDataSize, bool presort, const Partitioner & partitioner):
+        clusterSize{ips.size()}, connected{false}, _data{dir, maxDataSize, presort}, _partitioner{&partitioner} {
         if (clusterSize > 0) {
             init(ips);
         } else {
@@ -448,8 +456,8 @@ namespace ch {
 
     // Push data to the specific machine (partitioned by partitioner)
     template <typename DataType>
-    bool StreamManager<DataType>::push(DataType & v, const Partitioner & partitioner) {
-        size_t id = partitioner.getPartition(v.hashCode(), clusterSize);
+    bool StreamManager<DataType>::push(DataType & v) {
+        size_t id = _partitioner->getPartition(v.hashCode(), clusterSize);
         if (id == selfId) {
             return _data.store(v);
         } else {
@@ -497,6 +505,12 @@ namespace ch {
     template <typename DataType>
     void StreamManager<DataType>::setPresort(bool presort) {
         _data.setPresort(presort);
+    }
+
+    // Set partitioner
+    template <typename DataType>
+    void StreamManager<DataType>::setPartitioner(const Partitioner & partitioner) {
+        _partitioner = &partitioner;
     }
 }
 
