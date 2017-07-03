@@ -60,6 +60,38 @@ namespace ch {
         return (len == 0);
     }
 
+#if defined (__CH_KQUEUE__)
+    // kevent wrapper
+    int Kevent(int kq, const struct kevent *changelist, int nchanges, struct kevent *eventlist, int nevents, const struct timespec *timeout) {
+        int rv;
+        do {
+            rv = kevent(kq, changelist, nchanges, eventlist, nevents, timeout);
+        } while (rv < 0 && errno == EINTR);
+        return rv;
+    }
+
+#elif defined (_CH_EPOLL__)
+    // epoll_wait wrapper
+    int Epoll_wait(int epfd, struct epoll_event *events, int maxevents, int timeout) {
+        int rv;
+        do {
+            rv = epoll_wait(epfd, events, maxevents, timeout);
+        } while (rv < 0 && errno == EINTR);
+        return rv;
+    }
+
+#else
+    // select wrapper
+    int Select(int nfds, fd_set * readfds, fd_set * writefds, fd_set * errorfds, struct timeval * timeout) {
+        int rv;
+        do {
+            rv = select(nfds, readfds, writefds, errorfds, timeout);
+        } while (rv < 0 && errno == EINTR);
+        return rv;
+    }
+
+#endif
+
     /*
      * Network functions
      */

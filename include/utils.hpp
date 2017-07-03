@@ -37,6 +37,20 @@ namespace ch {
     // fread with given length
     bool pfread(FILE * fd, void * buffer, size_t len);
 
+#if defined (__CH_KQUEUE__)
+    // kevent wrapper
+    int Kevent(int kq, const struct kevent *changelist, int nchanges, struct kevent *eventlist, int nevents, const struct timespec *timeout);
+
+#elif defined (_CH_EPOLL__)
+    // epoll_wait wrapper
+    int Epoll_wait(int epfd, struct epoll_event *events, int maxevents, int timeout);
+
+#else
+    // select wrapper
+    int Select(int nfds, fd_set * readfds, fd_set * writefds, fd_set * errorfds, struct timeval * timeout);
+
+#endif
+
     /*
      * Network functions
      */

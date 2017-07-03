@@ -212,15 +212,17 @@ namespace ch {
                 repliedEOF[connections[i]] = false;
                 fdToIndex[connections[i]] = i;
             }
-            if (kevent(kq, events, nConnections, nullptr, 0, nullptr) < 0) {
+            if (Kevent(kq, events, nConnections, nullptr, 0, nullptr) < 0) {
                 close(kq);
                 return;
             }
 
             // Handle events
             while (endedConnection < nConnections) {
-                nEvents = kevent(kq, nullptr, 0, events, nConnections, nullptr);
-                if (nEvents > 0) {
+                nEvents = Kevent(kq, nullptr, 0, events, nConnections, nullptr);
+                if (nEvents < 0) {
+                    break;
+                } else {
                     for (int i = 0; i < nEvents; ++i) {
                         int sockfd = events[i].ident;
 
@@ -247,26 +249,36 @@ namespace ch {
 
             // Handle events
             while (endedConnection < nConnections) {
-                nEvents = epoll_wait(ep, events, nConnections, -1);
-                if (nEvents > 0) {
+                nEvents = Epoll_wait(ep, events, nConnections, -1);
+                if (nEvents < 0) {
+                    break;
+                } else {
                     for (int i = 0; i < nEvents; ++i) {
                         int sockfd = events[i].data.fd;
 #else
             // Register events
-            fd_set fdset;
+            fd_set fdset_o, fdset;
             int fdmax = 0;
+            FD_ZERO(&fdset_o);
             for (size_t i = 1; i < l; ++i) {
                 fdmax = MAX_VAL(fdmax, connections[i]);
-                FD_SET(connections[i], &fdset);
+                FD_SET(connections[i], &fdset_o);
                 repliedEOF[connections[i]] = false;
                 fdToIndex[connections[i]] = i;
             }
 
             // Handle events
             while (endedConnection < nConnections) {
-                int sockfd = select(fdmax + 1, &fdset, nullptr, nullptr, nullptr);
-                if (sockfd > 0) {
-                    if (FD_ISSET(sockfd, &fdset)) {
+                fdset = fdset_o;
+                nEvents = Select(fdmax + 1, &fdset, nullptr, nullptr, nullptr);
+                if (nEvents < 0) {
+                    break;
+                } else {
+                    for (size_t i = 1; i < l; ++i) {
+                        int sockfd = connections[i];
+                        if (!FD_ISSET(sockfd, &fdset)) {
+                            continue;
+                        }
 #endif
                         // It is guaranteed that only one thread for a sockfd runs at the same time
                         if (repliedEOF[sockfd]) {
@@ -315,6 +327,9 @@ namespace ch {
                                 }
                             }
                         }
+#if !defined (__CH_KQUEUE__) && !defined (__CH_EPOLL__) // select
+                        break;
+#endif
                     }
                 }
             }

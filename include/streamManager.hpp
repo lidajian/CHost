@@ -8,7 +8,6 @@
 #include <netinet/in.h> // sockaddr_in
 #include <unistd.h> // close
 #include <sys/socket.h> // accept
-#include <sys/select.h> // select
 
 #include <vector> // vector
 #include <string> // string
@@ -136,13 +135,72 @@ namespace ch {
         sockaddr_in remote;
         socklen_t s_size;
 
-        fd_set accept_fdset;
-        struct timeval timeout;
-
         const size_t numIP = ips.size();
 
         D("(StreamManager) Server accepting client.");
 
+#if defined (__CH_KQUEUE__)
+        int kq = kqueue();
+        int nEvents;
+
+        if (kq < 0) {
+            close(serverfd);
+            return;
+        }
+
+        struct kevent event;
+
+        // Register
+        EV_SET(&event, serverfd, EVFILT_READ, EV_ADD, 0, 0, nullptr);
+        if (Kevent(kq, &event, 1, nullptr, 0, nullptr) < 0) {
+            close(kq);
+            close(serverfd);
+            return;
+        }
+
+        struct timespec timeout;
+        timeout.tv_sec = ACCEPT_TIMEOUT;
+        timeout.tv_nsec = 0;
+
+        for (size_t i = 1; i < numIP; ++i) {
+
+            nEvents = Kevent(kq, nullptr, 0, &event, 1, &timeout);
+
+            if (nEvents <= 0) {
+                D("(StreamManager) Server failed to accept all clients within timeout.");
+                break;
+            } else {
+
+#elif defined (__CH_EPOLL__)
+        int ep = epoll_create1(0);
+        int nEvents;
+
+        if (ep < 0) {
+            close(serverfd);
+            return;
+        }
+
+        struct epoll_event event;
+
+        // Register
+        if (epoll_ctl(ep, EPOLL_CTL_ADD, serverfd, &event) < 0) {
+            close(ep);
+            close(serverfd);
+            return;
+        }
+
+        for (size_t i = 1; i < numIP; ++i) {
+
+            nEvents = Epoll_wait(ep, &event, 1, ACCEPT_TIMEOUT * 1000);
+
+            if (nEvents <= 0) {
+                D("(StreamManager) Server failed to accept all clients within timeout.");
+                break;
+            } else {
+
+#else
+        fd_set accept_fdset;
+        struct timeval timeout;
         for (size_t i = 1; i < numIP; ++i) {
 
             FD_ZERO(&accept_fdset);
@@ -151,18 +209,15 @@ namespace ch {
             timeout.tv_sec = ACCEPT_TIMEOUT;
             timeout.tv_usec = 0;
 
-            int rv;
-            do {
-                rv = select(serverfd + 1, &accept_fdset, nullptr, nullptr, &timeout);
-            } while (rv == -1 && errno == EINTR);
-
-            if (rv <= 0) {
+            if (Select(serverfd + 1, &accept_fdset, nullptr, nullptr, &timeout) <= 0) {
                 D("(StreamManager) Server failed to accept all clients within timeout.");
-                close(serverfd);
-                return;
+                break;
             }
 
-            if (FD_ISSET(serverfd, &accept_fdset)) {
+            if (!FD_ISSET(serverfd, &accept_fdset)) {
+                --i;
+            } else {
+#endif
                 int sockfd = accept(serverfd, reinterpret_cast<struct sockaddr *>(&remote), &s_size);
                 if (sockfd > 0 && (getpeername(sockfd, reinterpret_cast<struct sockaddr *>(&remote), &s_size) >= 0)) {
                     PSS("(StreamManager) Server accepted connection from " << inet_ntoa(remote.sin_addr));
@@ -171,10 +226,13 @@ namespace ch {
                 } else {
                     --i;
                 }
-            } else {
-                --i;
             }
         }
+#if defined (__CH_KQUEUE__)
+        close(kq);
+#elif defined (__CH_EPOLL__)
+        close(ep);
+#endif
 
         close(serverfd);
     }
