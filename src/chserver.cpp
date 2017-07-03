@@ -16,6 +16,8 @@ std::string workingDir;
 
 int serverfd;
 
+// Function call on SIGINT
+// Close on Ctrl + C
 void sigintHandler(int signo) {
     P("Server exited.");
     if (serverfd > 0) {
@@ -25,12 +27,13 @@ void sigintHandler(int signo) {
 }
 
 // Function called on terminate
+// Close on error
 void closefd() {
     P("Server terminated unexpectedly.");
     if (serverfd > 0) {
         close(serverfd);
     }
-    abort();
+    exit(EXIT_FAILURE);
 }
 
 // Get job function from job library and run the job
@@ -189,8 +192,6 @@ void serve(const int sockfd) {
 
 int main(int argc, char ** argv) {
 
-    signal(SIGINT, sigintHandler);
-
     if (!ch::getWorkingDirectory(workingDir)) {
         return 0;
     }
@@ -200,6 +201,7 @@ int main(int argc, char ** argv) {
     serverfd = INVALID_SOCKET;
 
     std::set_terminate(closefd);
+    signal(SIGINT, sigintHandler);
 
     sockaddr_in remote;
     socklen_t s_size;
