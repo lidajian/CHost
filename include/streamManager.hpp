@@ -19,6 +19,7 @@
 #include "objectStream.hpp" // ObjectInputStream, ObjectOutputStream
 #include "dataManager.hpp" // DataManager
 #include "partitioner.hpp" // Partitioner
+#include "threadPool.hpp" // ThreadPool
 
 namespace ch {
 
@@ -294,6 +295,11 @@ namespace ch {
     template <typename DataType>
     void StreamManager<DataType>::init(const ipconfig_t & ips){
 
+        if (clusterSize < 2) {
+            connected = true;
+            return;
+        }
+
         selfId = ips[0].first;
 
         int serverfd;
@@ -306,21 +312,17 @@ namespace ch {
         istreams.reserve(clusterSize - 1);
         ostreams.clear();
         ostreams.resize(clusterSize, nullptr);
+        ThreadPool threadPool{MIN_VAL(THREAD_POOL_SIZE, clusterSize)};
 
         // create server thread to accept connection
-        std::thread server_thread{serverThread, serverfd, std::ref(ips), std::ref(istreams)};
+        threadPool.addTask(serverThread, serverfd, std::ref(ips), std::ref(istreams));
 
         // create connect thread to connect to server
-        std::vector<std::thread> connectThreads;
         for (size_t i = 1; i < clusterSize; ++i) {
-            connectThreads.emplace_back(connectThread, std::ref(ips[i].second), std::ref(ostreams[ips[i].first]));
+            threadPool.addTask(connectThread, std::ref(ips[i].second), std::ref(ostreams[ips[i].first]));
         }
 
-        // Join server thread and connect threads
-        server_thread.join();
-        for (std::thread & thrd: connectThreads) {
-            thrd.join();
-        }
+        threadPool.stop();
 
         // Check for connection failure
         for (size_t i = 0; i < clusterSize; ++i) {
