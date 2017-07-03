@@ -14,6 +14,25 @@
 std::string confFilePath;
 std::string workingDir;
 
+int serverfd;
+
+void sigintHandler(int signo) {
+    P("Server exited.");
+    if (serverfd > 0) {
+        close(serverfd);
+    }
+    exit(0);
+}
+
+// Function called on terminate
+void closefd() {
+    P("Server terminated unexpectedly.");
+    if (serverfd > 0) {
+        close(serverfd);
+    }
+    abort();
+}
+
 // Get job function from job library and run the job
 bool runJob(const ipconfig_t & ips, ch::SourceManager & source, const std::string & outputFilePath, const std::string & jobFilePath, const bool isServer) {
     void * jobLib = dlopen(jobFilePath.c_str(), RTLD_LAZY);
@@ -170,13 +189,17 @@ void serve(const int sockfd) {
 
 int main(int argc, char ** argv) {
 
+    signal(SIGINT, sigintHandler);
+
     if (!ch::getWorkingDirectory(workingDir)) {
         return 0;
     }
 
     confFilePath = workingDir + IPCONFIG_FILE;
 
-    int serverfd = INVALID_SOCKET;
+    serverfd = INVALID_SOCKET;
+
+    std::set_terminate(closefd);
 
     sockaddr_in remote;
     socklen_t s_size;
