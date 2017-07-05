@@ -14,7 +14,7 @@
 #include <fstream> // ofstream
 #include <thread> // thread
 #include <chrono> // seconds
-#include <memory> // unique_ptr
+#include <memory> // unique_ptr, std::addressof
 
 #include "objectStream.hpp" // ObjectInputStream, ObjectOutputStream
 #include "dataManager.hpp" // DataManager
@@ -232,6 +232,9 @@ namespace ch {
                     istreams.push_back(stm);
                 } else {
                     --i;
+                    if (sockfd > 0) {
+                        close(sockfd);
+                    }
                 }
             }
         }
@@ -510,7 +513,7 @@ namespace ch {
     // Set partitioner
     template <typename DataType>
     void StreamManager<DataType>::setPartitioner(const Partitioner & partitioner) {
-        _partitioner = &partitioner;
+        _partitioner = std::addressof(partitioner);
     }
 }
 

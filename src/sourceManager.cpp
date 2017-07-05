@@ -194,6 +194,7 @@ namespace ch {
             ThreadPool threadPool{THREAD_POOL_SIZE};
 
             std::unordered_map<int, bool> repliedEOF;
+            std::unordered_map<int, std::string> splitCaches;
             std::unordered_map<int, int> fdToIndex;
             std::atomic_uint endedConnection{0};
 
@@ -208,9 +209,11 @@ namespace ch {
 
             struct kevent events[nConnections];
             for (size_t i = 1; i < l; ++i) {
-                EV_SET(events + i - 1, connections[i], EVFILT_READ, EV_ADD, 0, 0, nullptr);
-                repliedEOF[connections[i]] = false;
-                fdToIndex[connections[i]] = i;
+                const int & conn = connections[i];
+                EV_SET(events + i - 1, conn, EVFILT_READ, EV_ADD, 0, 0, nullptr);
+                repliedEOF[conn] = false;
+                fdToIndex[conn] = i;
+                splitCaches[conn] = std::string();
             }
             if (Kevent(kq, events, nConnections, nullptr, 0, nullptr) < 0) {
                 close(kq);
@@ -237,14 +240,16 @@ namespace ch {
 
             struct epoll_event events[nConnections];
             for (size_t i = 1; i < l; ++i) {
+                const int & conn = connections[i];
                 events[i - 1].events = EPOLLIN;
-                events[i - 1].data.fd = connections[i];
-                if (epoll_ctl(ep, EPOLL_CTL_ADD, connections[i], events) < 0) {
+                events[i - 1].data.fd = conn;
+                if (epoll_ctl(ep, EPOLL_CTL_ADD, conn, events) < 0) {
                     close(ep);
                     return;
                 }
-                repliedEOF[connections[i]] = false;
-                fdToIndex[connections[i]] = i;
+                repliedEOF[conn] = false;
+                fdToIndex[conn] = i;
+                splitCaches[conn] = std::string();
             }
 
             // Handle events
@@ -261,10 +266,12 @@ namespace ch {
             int fdmax = 0;
             FD_ZERO(&fdset_o);
             for (size_t i = 1; i < l; ++i) {
-                fdmax = MAX_VAL(fdmax, connections[i]);
-                FD_SET(connections[i], &fdset_o);
-                repliedEOF[connections[i]] = false;
-                fdToIndex[connections[i]] = i;
+                const int & conn = connections[i];
+                fdmax = MAX_VAL(fdmax, conn);
+                FD_SET(conn, &fdset_o);
+                repliedEOF[conn] = false;
+                fdToIndex[conn] = i;
+                splitCaches[conn] = std::string();
             }
 
             // Handle events
@@ -302,26 +309,23 @@ namespace ch {
                             // provide poll service
                             char receivedChar;
                             if (!precv(sockfd, static_cast<void *>(&receivedChar), sizeof(char))) {
-                                repliedEOF[sockfd] = true;
                                 ++endedConnection;
                                 close(sockfd);
                             } else {
                                 if (receivedChar == CALL_POLL) {
-                                    threadPool.addTask([this, sockfd, &repliedEOF, &endedConnection](){
-                                        std::string split;
+                                    std::string & split = splitCaches[sockfd];
+                                    threadPool.addTask([this, sockfd, &repliedEOF, &endedConnection, &split](){
                                         if (!(this->splitter.next(split))) { // end service by server
                                             ssize_t endSize = INVALID;
                                             repliedEOF[sockfd] = true;
                                             psend(sockfd, static_cast<void *>(&endSize), sizeof(ssize_t));
                                         } else if (!sendString(sockfd, split)) {
                                             E("(SourceManagerMaster) Failed to send split.");
-                                            repliedEOF[sockfd] = true;
                                             ++endedConnection;
                                             close(sockfd);
                                         }
                                     });
                                 } else {
-                                    repliedEOF[sockfd] = true;
                                     ++endedConnection;
                                     close(sockfd);
                                 }
