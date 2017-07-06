@@ -109,9 +109,7 @@ namespace ch {
             if (l < 2) {
                 // No worker
                 return;
-            }
-
-            if (l == 2) {
+            } else if (l == 2) {
                 // Only one worker, this thread servers as distribution threads
                 int & sockfd = this->connections[1];
                 char receivedChar;
@@ -139,10 +137,7 @@ namespace ch {
 
                 this->workerIsSuccess[1] = (receivedChar == RES_SUCCESS);
                 close(sockfd);
-                return;
-            }
-
-            if (l <= THREAD_POOL_SIZE) {
+            } else if (l <= THREAD_POOL_SIZE) {
                 // Less than/equals to THREAD_POOL_SIZE threads, start threads directly
                 std::vector<std::thread> dthreads;
 
@@ -182,167 +177,168 @@ namespace ch {
                 for (std::thread & thrd: dthreads) {
                     thrd.join();
                 }
-                return;
-            }
+            } else {
 
-            /*
-             * More than THREAD_POOL_SIZE threads: Event loop + thread pool
-             */
+                /*
+                 * More than THREAD_POOL_SIZE threads: Event loop + thread pool
+                 */
 
-            size_t nConnections = l - 1;
-            int nEvents;
-            ThreadPool threadPool{THREAD_POOL_SIZE};
+                size_t nConnections = l - 1;
+                int nEvents;
+                ThreadPool threadPool{THREAD_POOL_SIZE};
 
-            std::unordered_map<int, bool> repliedEOF;
-            std::unordered_map<int, std::string> splitCaches;
-            std::unordered_map<int, int> fdToIndex;
-            std::atomic_uint endedConnection{0};
+                std::unordered_map<int, bool> repliedEOF;
+                std::unordered_map<int, std::string> splitCaches;
+                std::unordered_map<int, int> fdToIndex;
+                std::atomic_uint endedConnection{0};
 
 #if defined (__CH_KQUEUE__)
 
-            // Register events
-            int kq = kqueue();
+                // Register events
+                int kq = kqueue();
 
-            if (kq < 0) {
-                return;
-            }
-
-            struct kevent events[nConnections];
-            for (size_t i = 1; i < l; ++i) {
-                const int & conn = connections[i];
-                EV_SET(events + i - 1, conn, EVFILT_READ, EV_ADD, 0, 0, nullptr);
-                repliedEOF[conn] = false;
-                fdToIndex[conn] = i;
-                splitCaches[conn] = std::string();
-            }
-            if (Kevent(kq, events, nConnections, nullptr, 0, nullptr) < 0) {
-                close(kq);
-                return;
-            }
-
-            // Handle events
-            while (endedConnection < nConnections) {
-                nEvents = Kevent(kq, nullptr, 0, events, nConnections, nullptr);
-                if (nEvents < 0) {
-                    break;
-                } else {
-                    for (int i = 0; i < nEvents; ++i) {
-                        int sockfd = events[i].ident;
-
-#elif defined (__CH_EPOLL__)
-
-            // Register events
-            int ep = epoll_create1(0);
-
-            if (ep < 0) {
-                return;
-            }
-
-            struct epoll_event events[nConnections];
-            for (size_t i = 1; i < l; ++i) {
-                const int & conn = connections[i];
-                events[i - 1].events = EPOLLIN;
-                events[i - 1].data.fd = conn;
-                if (epoll_ctl(ep, EPOLL_CTL_ADD, conn, events) < 0) {
-                    close(ep);
+                if (kq < 0) {
                     return;
                 }
-                repliedEOF[conn] = false;
-                fdToIndex[conn] = i;
-                splitCaches[conn] = std::string();
-            }
 
-            // Handle events
-            while (endedConnection < nConnections) {
-                nEvents = Epoll_wait(ep, events, nConnections, -1);
-                if (nEvents < 0) {
-                    break;
-                } else {
-                    for (int i = 0; i < nEvents; ++i) {
-                        int sockfd = events[i].data.fd;
-#else
-            // Register events
-            fd_set fdset_o, fdset;
-            int fdmax = 0;
-            FD_ZERO(&fdset_o);
-            for (size_t i = 1; i < l; ++i) {
-                const int & conn = connections[i];
-                fdmax = MAX_VAL(fdmax, conn);
-                FD_SET(conn, &fdset_o);
-                repliedEOF[conn] = false;
-                fdToIndex[conn] = i;
-                splitCaches[conn] = std::string();
-            }
+                struct kevent events[nConnections];
+                for (size_t i = 1; i < l; ++i) {
+                    const int & conn = connections[i];
+                    EV_SET(events + i - 1, conn, EVFILT_READ, EV_ADD, 0, 0, nullptr);
+                    repliedEOF[conn] = false;
+                    fdToIndex[conn] = i;
+                    splitCaches[conn] = std::string();
+                }
+                if (Kevent(kq, events, nConnections, nullptr, 0, nullptr) < 0) {
+                    close(kq);
+                    return;
+                }
 
-            // Handle events
-            while (endedConnection < nConnections) {
-                fdset = fdset_o;
-                nEvents = Select(fdmax + 1, &fdset, nullptr, nullptr, nullptr);
-                if (nEvents < 0) {
-                    break;
-                } else {
-                    for (size_t i = 1; i < l; ++i) {
-                        int sockfd = connections[i];
-                        if (!FD_ISSET(sockfd, &fdset)) {
-                            continue;
-                        }
-#endif
-                        // It is guaranteed that only one thread for a sockfd runs at the same time
-                        if (repliedEOF[sockfd]) {
-                            char receivedChar = RES_FAIL;
-
-                            if (!precv(sockfd, static_cast<void *>(&receivedChar), sizeof(char))) {
-                                E("(SourceManagerMaster) No response from worker.");
-                                ++endedConnection;
-                                close(sockfd);
-                            } else {
-                                if (receivedChar == RES_FAIL) {
-                                    ++endedConnection;
-                                    close(sockfd);
-                                } else if (receivedChar == RES_SUCCESS) {
-                                    this->workerIsSuccess[fdToIndex[sockfd]] = (receivedChar == RES_SUCCESS);
-                                    ++endedConnection;
-                                    close(sockfd);
-                                }
-                            }
-                        } else {
-                            // provide poll service
-                            char receivedChar;
-                            if (!precv(sockfd, static_cast<void *>(&receivedChar), sizeof(char))) {
-                                ++endedConnection;
-                                close(sockfd);
-                            } else {
-                                if (receivedChar == CALL_POLL) {
-                                    std::string & split = splitCaches[sockfd];
-                                    threadPool.addTask([this, sockfd, &repliedEOF, &endedConnection, &split](){
-                                        if (!(this->splitter.next(split))) { // end service by server
-                                            ssize_t endSize = INVALID;
-                                            repliedEOF[sockfd] = true;
-                                            psend(sockfd, static_cast<void *>(&endSize), sizeof(ssize_t));
-                                        } else if (!sendString(sockfd, split)) {
-                                            E("(SourceManagerMaster) Failed to send split.");
-                                            ++endedConnection;
-                                            close(sockfd);
-                                        }
-                                    });
-                                } else {
-                                    ++endedConnection;
-                                    close(sockfd);
-                                }
-                            }
-                        }
-#if !defined (__CH_KQUEUE__) && !defined (__CH_EPOLL__) // select
+                // Handle events
+                while (endedConnection < nConnections) {
+                    nEvents = Kevent(kq, nullptr, 0, events, nConnections, nullptr);
+                    if (nEvents < 0) {
                         break;
+                    } else {
+                        for (int i = 0; i < nEvents; ++i) {
+                            int sockfd = events[i].ident;
+
+#elif defined (__CH_EPOLL__)
+
+                // Register events
+                int ep = epoll_create1(0);
+
+                if (ep < 0) {
+                    return;
+                }
+
+                struct epoll_event events[nConnections];
+                for (size_t i = 1; i < l; ++i) {
+                    const int & conn = connections[i];
+                    events[0].events = EPOLLIN;
+                    events[0].data.fd = conn;
+                    if (epoll_ctl(ep, EPOLL_CTL_ADD, conn, events) < 0) {
+                        close(ep);
+                        return;
+                    }
+                    repliedEOF[conn] = false;
+                    fdToIndex[conn] = i;
+                    splitCaches[conn] = std::string();
+                }
+
+                // Handle events
+                while (endedConnection < nConnections) {
+                    nEvents = Epoll_wait(ep, events, nConnections, -1);
+                    if (nEvents < 0) {
+                        break;
+                    } else {
+                        for (int i = 0; i < nEvents; ++i) {
+                            int sockfd = events[i].data.fd;
+#else
+                // Register events
+                fd_set fdset_o, fdset;
+                int fdmax = 0;
+                FD_ZERO(&fdset_o);
+                for (size_t i = 1; i < l; ++i) {
+                    const int & conn = connections[i];
+                    fdmax = MAX_VAL(fdmax, conn);
+                    FD_SET(conn, &fdset_o);
+                    repliedEOF[conn] = false;
+                    fdToIndex[conn] = i;
+                    splitCaches[conn] = std::string();
+                }
+
+                // Handle events
+                while (endedConnection < nConnections) {
+                    FD_COPY(&fdset_o, &fdset);
+                    nEvents = Select(fdmax + 1, &fdset, nullptr, nullptr, nullptr);
+                    if (nEvents < 0) {
+                        break;
+                    } else {
+                        for (size_t i = 1; i < l; ++i) {
+                            int sockfd = connections[i];
+                            if (!FD_ISSET(sockfd, &fdset_o)) {
+                                continue;
+                            }
 #endif
+                            // It is guaranteed that only one thread for a sockfd runs at the same time
+                            if (repliedEOF[sockfd]) {
+                                char receivedChar = RES_FAIL;
+
+                                if (!precv(sockfd, static_cast<void *>(&receivedChar), sizeof(char))) {
+                                    E("(SourceManagerMaster) No response from worker.");
+                                    ++endedConnection;
+                                    close(sockfd);
+                                } else {
+                                    if (receivedChar == RES_FAIL) {
+                                        ++endedConnection;
+                                        close(sockfd);
+                                    } else if (receivedChar == RES_SUCCESS) {
+                                        this->workerIsSuccess[fdToIndex[sockfd]] = (receivedChar == RES_SUCCESS);
+                                        ++endedConnection;
+                                        close(sockfd);
+                                    }
+                                }
+                            } else {
+                                // provide poll service
+                                char receivedChar;
+                                if (!precv(sockfd, static_cast<void *>(&receivedChar), sizeof(char))) {
+                                    ++endedConnection;
+                                    close(sockfd);
+                                } else {
+                                    if (receivedChar == CALL_POLL) {
+                                        std::string & split = splitCaches[sockfd];
+                                        threadPool.addTask([this, sockfd, &repliedEOF, &endedConnection, &split](){
+                                            if (!(this->splitter.next(split))) { // end service by server
+                                                ssize_t endSize = INVALID;
+                                                repliedEOF[sockfd] = true;
+                                                psend(sockfd, static_cast<void *>(&endSize), sizeof(ssize_t));
+                                            } else if (!sendString(sockfd, split)) {
+                                                E("(SourceManagerMaster) Failed to send split.");
+                                                ++endedConnection;
+                                                close(sockfd);
+                                            }
+                                        });
+                                    } else {
+                                        ++endedConnection;
+                                        close(sockfd);
+                                    }
+                                }
+                            }
+#if !defined (__CH_KQUEUE__) && !defined (__CH_EPOLL__) // select
+                            break;
+#endif
+                        }
                     }
                 }
-            }
-            connections.clear();
+                connections.clear();
 #if defined (__CH_KQUEUE__)
-            close(kq);
+                close(kq);
 #elif defined (__CH_EPOLL__)
-            close(ep);
+                close(ep);
 #endif
+
+            }
         }};
     }
 

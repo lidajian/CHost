@@ -39,8 +39,11 @@ namespace ch {
             // True if connected
             bool connected;
 
-            // Receive threads
-            std::vector<std::thread> receiveThreads;
+            // Receive file descriptors
+            std::vector<int> connections;
+
+            // Receive thread(s)
+            std::thread * receiveThread;
 
             // Input streams
             std::vector<ObjectInputStream<DataType> *> istreams;
@@ -55,22 +58,18 @@ namespace ch {
             const Partitioner * _partitioner;
 
             // Server thread: accept connections
-            static void serverThread(int serverfd, const ipconfig_t & ips, std::vector<ObjectInputStream<DataType> *> & istreams);
+            static void serverThread(int serverfd, const ipconfig_t & ips, std::vector<ObjectInputStream<DataType> *> & istreams, std::vector<int> & connections);
 
             // Connect thread: connect to servers
             // sets stmr to the created object output stream if success
             static void connectThread(const std::string & ip, ObjectOutputStream<DataType> * & stmr);
 
-            // Receive thread: receive objects and store
-            static void recvThread(ObjectInputStream<DataType> * & stm, DataManager<DataType> & data);
-
             // Close and clear all streams
             void clearStreams();
 
             // Initialize streams
-            // 1. Accept and connect to all machines
-            // 2. Start receive threads if step 1 success
-            void init(const ipconfig_t & ips);
+            // Accept and connect to all machines
+            void establishConnection(const ipconfig_t & ips);
         public:
             // Constructor: given directory of configuration
             StreamManager(const std::string & configureFile, const std::string & dir, size_t maxDataSize = DEFAULT_MAX_DATA_SIZE, bool presort = true, const Partitioner & partitioner = hashPartitioner);
@@ -102,7 +101,7 @@ namespace ch {
             bool isConnected(void) const;
 
             // Start receive on all sockets
-            void startRecvThreads(void);
+            void startReceive(void);
 
             // Send stop signal to other machines, cause receive thread on other machines to terminate and close connection
             // called when we don't need these connections anymore
@@ -137,7 +136,7 @@ namespace ch {
 
     // Server thread: accept connections
     template <typename DataType>
-    void StreamManager<DataType>::serverThread(int serverfd, const ipconfig_t & ips, std::vector<ObjectInputStream<DataType> *> & istreams) {
+    void StreamManager<DataType>::serverThread(int serverfd, const ipconfig_t & ips, std::vector<ObjectInputStream<DataType> *> & istreams, std::vector<int> & connections) {
 
         sockaddr_in remote;
         socklen_t s_size;
@@ -228,6 +227,7 @@ namespace ch {
                 int sockfd = accept(serverfd, reinterpret_cast<struct sockaddr *>(&remote), &s_size);
                 if (sockfd > 0 && (getpeername(sockfd, reinterpret_cast<struct sockaddr *>(&remote), &s_size) >= 0)) {
                     PSS("(StreamManager) Server accepted connection from " << inet_ntoa(remote.sin_addr));
+                    connections.push_back(sockfd);
                     ObjectInputStream<DataType> * stm = new ObjectInputStream<DataType>(sockfd);
                     istreams.push_back(stm);
                 } else {
@@ -268,17 +268,6 @@ namespace ch {
         }
     }
 
-    // Receive thread: receive objects and store
-    template <typename DataType>
-    void StreamManager<DataType>::recvThread(ObjectInputStream<DataType> * & stm, DataManager<DataType> & data) {
-        DataType * got = nullptr;
-        while ((got = stm->recv())) {
-            if (!data.store(got)) {
-                break;
-            }
-        }
-    }
-
     // Close and clear all streams
     template <typename DataType>
     void StreamManager<DataType>::clearStreams() {
@@ -299,10 +288,9 @@ namespace ch {
     }
 
     // Initialize streams
-    // 1. Accept and connect to all machines
-    // 2. Start receive threads if step 1 success
+    // Accept and connect to all machines
     template <typename DataType>
-    void StreamManager<DataType>::init(const ipconfig_t & ips){
+    void StreamManager<DataType>::establishConnection(const ipconfig_t & ips){
 
         if (clusterSize < 2) {
             connected = true;
@@ -319,12 +307,14 @@ namespace ch {
 
         istreams.clear();
         istreams.reserve(clusterSize - 1);
+        connections.clear();
+        connections.reserve(clusterSize - 1);
         ostreams.clear();
         ostreams.resize(clusterSize, nullptr);
         ThreadPool threadPool{MIN_VAL(THREAD_POOL_SIZE, clusterSize)};
 
         // create server thread to accept connection
-        threadPool.addTask(serverThread, serverfd, std::ref(ips), std::ref(istreams));
+        threadPool.addTask(serverThread, serverfd, std::ref(ips), std::ref(istreams), std::ref(connections));
 
         // create connect thread to connect to server
         for (size_t i = 1; i < clusterSize; ++i) {
@@ -356,14 +346,14 @@ namespace ch {
     // Constructor: given directory of configuration
     template <typename DataType>
     StreamManager<DataType>::StreamManager(const std::string & configureFile, const std::string & dir, size_t maxDataSize, bool presort, const Partitioner & partitioner):
-        connected{false}, _data{dir, maxDataSize, presort}, _partitioner{&partitioner} {
+        connected{false}, receiveThread{nullptr}, _data{dir, maxDataSize, presort}, _partitioner{&partitioner} {
         ipconfig_t ips;
         if (!readIPs(configureFile, ips)) {
             return;
         }
         clusterSize = ips.size();
         if (clusterSize > 0) {
-            init(ips);
+            establishConnection(ips);
         } else {
             E("(StreamManager) Empty configuration.");
         }
@@ -372,9 +362,9 @@ namespace ch {
     // Constructor: given vector of IP configuration
     template <typename DataType>
     StreamManager<DataType>::StreamManager(const ipconfig_t & ips, const std::string & dir, size_t maxDataSize, bool presort, const Partitioner & partitioner):
-        clusterSize{ips.size()}, connected{false}, _data{dir, maxDataSize, presort}, _partitioner{&partitioner} {
+        clusterSize{ips.size()}, connected{false}, receiveThread{nullptr}, _data{dir, maxDataSize, presort}, _partitioner{&partitioner} {
         if (clusterSize > 0) {
-            init(ips);
+            establishConnection(ips);
         } else {
             E("(StreamManager) Empty configuration.");
         }
@@ -399,7 +389,7 @@ namespace ch {
     // True if receive threads exists
     template <typename DataType>
     inline bool StreamManager<DataType>::isReceiving(void) const {
-        return (receiveThreads.size() + 1 == clusterSize);
+        return (receiveThread != nullptr);
     }
 
     // True if connected
@@ -410,14 +400,189 @@ namespace ch {
 
     // Start receive on all sockets
     template <typename DataType>
-    void StreamManager<DataType>::startRecvThreads(void) {
+    void StreamManager<DataType>::startReceive(void) {
         if (isReceiving()) {
             D("(StreamManager) Already receiving.");
         } else if (isConnected()) {
+            receiveThread = new std::thread([this](){
+                size_t nWorker = this->connections.size();
+                if (nWorker == 0) {
+                    return;
+                } else if (nWorker == 1) {
+                    const ObjectInputStream<DataType> * stm = this->istreams[0];
+                    DataType * got = nullptr;
+                    while ((got = stm->recv())) {
+                        if (!(this->_data.store(got))) {
+                            break;
+                        }
+                    }
+                } else if (nWorker <= THREAD_POOL_SIZE) {
+                    std::vector<std::thread> threads;
+                    for (size_t i = 0; i < nWorker; ++i) {
+                        const ObjectInputStream<DataType> * stm = this->istreams[i++];
+                        threads.emplace_back([this, &stm](){
+                            DataType * got = nullptr;
+                            while ((got = stm->recv())) {
+                                if (!this->_data.store(got)) {
+                                    break;
+                                }
+                            }
+                        });
+                    }
+                    for (std::thread & thrd: threads) {
+                        thrd.join();
+                    }
+                } else {
+                    /*
+                     * More than THREAD_POOL_SIZE threads: Event loop + thread pool
+                     */
 
-            for (size_t i = 0; i < clusterSize - 1; i++) {
-                receiveThreads.emplace_back(recvThread, std::ref(istreams[i]), std::ref(_data));
-            }
+                    int nEvents;
+                    ThreadPool threadPool{THREAD_POOL_SIZE};
+
+                    std::unordered_map<int, int> fdToIndex;
+                    std::atomic_uint endedReceive{0};
+
+#if defined (__CH_KQUEUE__)
+
+                    // Register events
+                    int kq = kqueue();
+
+                    if (kq < 0) {
+                        return;
+                    }
+
+                    struct kevent event, events[nWorker];
+                    for (size_t i = 0; i < nWorker; ++i) {
+                        const int & conn = this->connections[i];
+                        EV_SET(events + i - 1, conn, EVFILT_READ, EV_ADD, 0, 0, nullptr);
+                        fdToIndex[conn] = i;
+                    }
+                    if (Kevent(kq, events, nWorker, nullptr, 0, nullptr) < 0) {
+                        close(kq);
+                        return;
+                    }
+
+                    struct timespec timeout;
+                    timeout.tv_sec = RECEIVE_TIMEOUT;
+                    timeout.tv_nsec = 0;
+
+                    // Handle events
+                    while (endedReceive < nWorker) {
+                        nEvents = Kevent(kq, nullptr, 0, events, nWorker, &timeout);
+                        if (nEvents < 0) {
+                            break;
+                        } else {
+                            for (int i = 0; i < nEvents; ++i) {
+                                int sockfd = events[i].ident;
+                                EV_SET(&event, sockfd, EVFILT_READ, EV_DISABLE, 0, 0, nullptr);
+                                if (Kevent(kq, &event, 1, nullptr, 0, nullptr) < 0) {
+                                    close(kq);
+                                    return;
+                                }
+                                threadPool.addTask([this, sockfd, &endedReceive, &fdToIndex, kq](){
+
+#elif defined (__CH_EPOLL__)
+
+                    // Register events
+                    int ep = epoll_create1(0);
+
+                    if (ep < 0) {
+                        return;
+                    }
+
+                    struct epoll_event event, events[nWorker];
+                    for (size_t i = 0; i < nWorker; ++i) {
+                        const int & conn = this->connections[i];
+                        event.events = EPOLLIN;
+                        event.data.fd = conn;
+                        if (epoll_ctl(ep, EPOLL_CTL_ADD, conn, &event) < 0) {
+                            close(ep);
+                            return;
+                        }
+                        fdToIndex[conn] = i;
+                    }
+
+                    // Handle events
+                    while (endedReceive < nWorker) {
+                        nEvents = Epoll_wait(ep, events, nWorker, RECEIVE_TIMEOUT * 1000);
+                        if (nEvents < 0) {
+                            break;
+                        } else {
+                            for (int i = 0; i < nEvents; ++i) {
+                                int sockfd = events[i].data.fd;
+                                if (epoll_ctl(ep, EPOLL_CTL_DEL, sockfd, nullptr) < 0) {
+                                    close(ep);
+                                    return;
+                                }
+                                threadPool.addTask([this, sockfd, &endedReceive, &fdToIndex, ep](){
+#else
+                    // Register events
+                    fd_set fdset_o, fdset;
+                    int fdmax = 0;
+                    FD_ZERO(&fdset_o);
+                    for (size_t i = 0; i < nWorker; ++i) {
+                        const int & conn = this->connections[i];
+                        fdmax = MAX_VAL(fdmax, conn);
+                        FD_SET(conn, &fdset_o);
+                        fdToIndex[conn] = i;
+                    }
+
+                    struct timeval timeout;
+                    timeout.tv_sec = RECEIVE_TIMEOUT;
+                    timeout.tv_usec = 0;
+
+                    // Handle events
+                    while (endedReceive < nWorker) {
+                        FD_COPY(&fdset_o, &fdset);
+                        nEvents = Select(fdmax + 1, &fdset, nullptr, nullptr, &timeout);
+                        if (nEvents < 0) {
+                            break;
+                        } else {
+                            for (size_t i = 0; i < nWorker; ++i) {
+                                int sockfd = this->connections[i];
+                                if (!FD_ISSET(sockfd, &fdset_o)) {
+                                    continue;
+                                }
+                                FD_CLR(sockfd, &fdset_o);
+                                threadPool.addTask([this, sockfd, &endedReceive, &fdToIndex, &fdset_o](){
+#endif
+                                    const ObjectInputStream<DataType> * stm = this->istreams[fdToIndex[sockfd]];
+                                    DataType * got = nullptr;
+                                    if ((got = stm->recv())) {
+                                        if (!this->_data.store(got)) {
+                                            ++endedReceive;
+                                        } else {
+#if defined (__CH_KQUEUE__)
+                                            struct kevent event;
+                                            EV_SET(&event, sockfd, EVFILT_READ, EV_ENABLE, 0, 0, nullptr);
+                                            Kevent(kq, &event, 1, nullptr, 0, nullptr);
+#elif defined (__CH_EPOLL__)
+                                            struct epoll_event event;
+                                            event.events = EPOLLIN;
+                                            event.data = sockfd;
+                                            epoll_ctl(ep, EPOLL_CTL_ADD, sockfd, &event);
+#else
+                                            FD_SET(sockfd, fdset_o);
+#endif
+                                        }
+                                    } else {
+                                        ++endedReceive;
+                                    }
+                                });
+#if !defined (__CH_KQUEUE__) && !defined (__CH_EPOLL__)
+                                break;
+#endif
+                            }
+                        }
+                    }
+#if defined (__CH_KQUEUE__)
+                    close(kq);
+#elif defined (__CH_EPOLL__)
+                    close(ep);
+#endif
+                    }
+            });
         }
     }
 
@@ -449,10 +614,9 @@ namespace ch {
     template <typename DataType>
     void StreamManager<DataType>::blockTillRecvEnd(void) {
         if (isReceiving()) {
-            for (std::thread & thrd: receiveThreads) {
-                thrd.join();
-            }
-            receiveThreads.clear();
+            receiveThread->join();
+            delete receiveThread;
+            receiveThread = nullptr;
             D("(StreamManager) Receive threads ended.");
         }
     }

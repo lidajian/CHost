@@ -68,7 +68,7 @@ namespace ch {
             return false;
         }
 
-        stm.startRecvThreads();
+        stm.startReceive();
 
         if (!stm.isReceiving()) { // Fail to start receive threads
             E("(Job) StreamManager start receive threads failed. Nothing done.");
@@ -87,7 +87,7 @@ namespace ch {
         std::unique_ptr<SortedStream<MapperReducerOutputType> > _sorted{sorted};
 
         stm.setPresort(false);
-        stm.startRecvThreads();
+        stm.startReceive();
 
         if (!stm.isReceiving()) { // Fail to start receive threads
             E("(Job) StreamManager start receive threads failed. Fail to perform reduce on this machine.");
@@ -124,7 +124,7 @@ namespace ch {
             return false;
         }
 
-        stm_mapper.startRecvThreads();
+        stm_mapper.startReceive();
 
         if (!stm_mapper.isReceiving()) { // Fail to start receive threads
             E("(Job) StreamManager start receive threads failed. Nothing done.");
@@ -149,7 +149,7 @@ namespace ch {
             return false;
         }
 
-        stm_reducer.startRecvThreads();
+        stm_reducer.startReceive();
 
         if (!stm_reducer.isReceiving()) { // Fail to start receive threads
             E("(Job) StreamManager start receive threads failed. Fail to perform reduce on this machine.");

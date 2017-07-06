@@ -43,7 +43,7 @@ namespace ch {
             // File descriptor of connections
             std::vector<int> connections;
 
-            // Distribution thread
+            // Distribution thread(s)
             std::thread * dthread;
 
             // Results from workers

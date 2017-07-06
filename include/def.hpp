@@ -88,6 +88,7 @@ P(tss.str().c_str())
 #define OPEN_FILESTREAM_RETRY_INTERVAL 60 // seconds
 #define CONNECTION_RETRY_INTERVAL 1 // seconds
 #define ACCEPT_TIMEOUT 5 // seconds
+#define RECEIVE_TIMEOUT 5 // seconds
 #define MAX_CONNECTION_ATTEMPT 15
 #define BUFFER_SIZE 1024
 #define DATA_BLOCK_SIZE 65536

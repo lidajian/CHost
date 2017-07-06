@@ -51,7 +51,7 @@ namespace ch {
             virtual void close(void) = 0;
 
             // True if the socket is valid
-            bool isValid(void);
+            bool isValid(void) const ;
     };
 
     /*
@@ -91,7 +91,7 @@ namespace ch {
             void close(void);
 
             // Send data through socket
-            bool send(const DataType & v);
+            bool send(const DataType & v) const ;
     };
 
     /*
@@ -123,7 +123,7 @@ namespace ch {
 
             // Receive data, return pointer to data if success
             // return nullptr if failed
-            DataType * recv(void);
+            DataType * recv(void) const;
     };
 
     /********************************************
@@ -152,7 +152,7 @@ namespace ch {
     ObjectStream::~ObjectStream() {}
 
     // True if the socket is valid
-    inline bool ObjectStream::isValid(void) {
+    inline bool ObjectStream::isValid(void) const {
         return _sockfd != INVALID_SOCKET;
     }
 
@@ -211,7 +211,7 @@ namespace ch {
 
     // Send data through socket
     template <typename DataType>
-    bool ObjectOutputStream<DataType>::send(const DataType & v) {
+    bool ObjectOutputStream<DataType>::send(const DataType & v) const {
         DSS("ObjectOutputStream: Sending " << v);
         id_t id = DataType::getId();
         if (psend(_sockfd, static_cast<const void *>(&id), sizeof(id_t))) {
@@ -256,7 +256,7 @@ namespace ch {
     // Receive data, return pointer to data if success
     // return nullptr if failed
     template <typename DataType>
-    DataType * ObjectInputStream<DataType>::recv(void) {
+    DataType * ObjectInputStream<DataType>::recv(void) const {
         id_t id = ID_INVALID;
         if (precv(_sockfd, static_cast<void *>(&id), sizeof(id_t))) {
             if (id == DataType::getId()) {
