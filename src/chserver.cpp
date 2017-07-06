@@ -14,7 +14,7 @@
 std::string confFilePath;
 std::string workingDir;
 
-int serverfd;
+int serverfd = INVALID_SOCKET;
 
 // Function call on SIGINT
 // Close on Ctrl + C
@@ -197,8 +197,6 @@ int main(int argc, char ** argv) {
     }
 
     confFilePath = workingDir + IPCONFIG_FILE;
-
-    serverfd = INVALID_SOCKET;
 
     std::set_terminate(closefd);
     signal(SIGINT, sigintHandler);
