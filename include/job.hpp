@@ -8,6 +8,7 @@
 #include <string> // string
 #include <vector> // vector
 #include <memory> // unique_ptr
+#include <thread> // thread
 
 #include "def.hpp" // ipconfig_t
 #include "sourceManager.hpp" // SourceManager
@@ -24,12 +25,14 @@ namespace ch {
         const std::string & _outputFilePath;
         const std::string & _workingDir;
         const bool _isServer;
+        const bool _supportMultipleMapper;
 
         explicit context_t(const ipconfig_t & ips,
                            ch::SourceManager & source,
                            const std::string & outputFilePath,
                            const std::string & workingDir,
-                           const bool isServer = false): _ips(ips), _source(source), _outputFilePath(outputFilePath), _workingDir(workingDir), _isServer(isServer) {}
+                           const bool isServer = false,
+                           const bool supportMultipleMapper = false): _ips(ips), _source(source), _outputFilePath(outputFilePath), _workingDir(workingDir), _isServer(isServer), _supportMultipleMapper(supportMultipleMapper) {}
     };
 
     // Job function type
@@ -59,7 +62,6 @@ namespace ch {
      */
     template <typename MapperReducerOutputType>
     bool simpleJob(context_t & context) {
-        std::string polled;
 
         StreamManager<MapperReducerOutputType> stm{context._ips, context._workingDir, DEFAULT_MAX_DATA_SIZE};
 
@@ -76,9 +78,34 @@ namespace ch {
         }
 
         // Map
+#ifndef MULTIPLE_MAPPER
+        std::string polled;
         while (context._source.poll(polled)) {
             mapper(polled, stm);
         }
+#else
+        if (context._supportMultipleMapper) {
+            std::vector<std::thread> mappers;
+            std::vector<std::string> polleds(NUM_MAPPER);
+            SourceManager & source = context._source;
+            for (size_t i = 0; i < NUM_MAPPER; ++i) {
+                std::string & polled = polleds[i];
+                mappers.emplace_back([&source, &polled, &stm](){
+                    while (source.poll(polled)) {
+                        mapper(polled, stm);
+                    }
+                });
+            }
+            for (std::thread & thrd: mappers) {
+                thrd.join();
+            }
+        } else {
+            std::string polled;
+            while (context._source.poll(polled)) {
+                mapper(polled, stm);
+            }
+        }
+#endif
         stm.stopSend();
         stm.blockTillRecvEnd();
         // End of map
@@ -115,7 +142,6 @@ namespace ch {
      */
     template <typename MapperOutputType, typename ReducerOutputType>
     bool completeJob(context_t & context) {
-        std::string polled;
 
         StreamManager<MapperOutputType> stm_mapper{context._ips, context._workingDir, DEFAULT_MAX_DATA_SIZE};
 
@@ -132,9 +158,34 @@ namespace ch {
         }
 
         // Map
+#ifndef MULTIPLE_MAPPER
+        std::string polled;
         while (context._source.poll(polled)) {
             mapper(polled, stm_mapper);
         }
+#else
+        if (context._supportMultipleMapper) {
+            std::vector<std::thread> mappers;
+            std::vector<std::string> polleds(NUM_MAPPER);
+            SourceManager & source = context._source;
+            for (size_t i = 0; i < NUM_MAPPER; ++i) {
+                std::string & polled = polleds[i];
+                mappers.emplace_back([&source, &polled, &stm_mapper](){
+                    while (source.poll(polled)) {
+                        mapper(polled, stm_mapper);
+                    }
+                });
+            }
+            for (std::thread & thrd: mappers) {
+                thrd.join();
+            }
+        } else {
+            std::string polled;
+            while (context._source.poll(polled)) {
+                mapper(polled, stm_mapper);
+            }
+        }
+#endif
         stm_mapper.finalizeSend();
         stm_mapper.blockTillRecvEnd();
         // End of map

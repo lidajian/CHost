@@ -101,10 +101,15 @@ int main(int argc, char ** argv) {
         return 0;
     }
 
-    // Check existence of output file
+    // Check existence of files
+    if (!ch::fileExist(confFilePath.c_str())) {
+        E("The configuration file does not exist.");
+        I("Please specify a valid configuration file path.");
+        return 0;
+    }
     if (!ch::fileExist(dataFilePath.c_str())) {
         E("The data file does not exist.");
-        I("Please specify a valid data file.");
+        I("Please specify a valid data file path.");
         return 0;
     }
     if (ch::fileExist(outputFilePath.c_str())) {
@@ -114,7 +119,7 @@ int main(int argc, char ** argv) {
     }
     if (!ch::fileExist(jobFilePath.c_str())) {
         E("The job file exists.");
-        I("Please specify a valid job file.");
+        I("Please specify a valid job file path.");
         return 0;
     }
 
@@ -124,7 +129,8 @@ int main(int argc, char ** argv) {
     targetConfFilePath = workingDir + IPCONFIG_FILE;
     if (!createTargetConfigurationFile(confFilePath, targetConfFilePath)) {
         E("Cannot create configuration file for server.");
-        I("The working directory may exist, try to clean the working directory.");
+        I("1. The configuration file may not be well formated.");
+        I("2. The configuration file in working directory may exist, try to clean the working directory.");
         return 0;
     }
 

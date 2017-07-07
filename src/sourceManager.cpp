@@ -372,7 +372,6 @@ namespace ch {
     }
 
     bool SourceManagerMaster::poll(std::string & ret) {
-        ret.clear();
         return splitter.next(ret);
     }
 
@@ -430,7 +429,9 @@ namespace ch {
     }
 
     bool SourceManagerWorker::poll(std::string & ret) {
-        ret.clear();
+#ifdef MULTIPLE_MAPPER
+        std::lock_guard<std::mutex> holder{lock};
+#endif
         if (!isValid()) {
             D("(SourceManagerWorker) The socket failed.");
             return false;

@@ -10,6 +10,7 @@
 #include <string> // string
 #include <atomic> // atomic_uint
 #include <unordered_map> // unordered_map
+#include <mutex> // mutex
 
 #include "splitter.hpp" // Splitter
 #include "utils.hpp" // sconnect, invokeWorker
@@ -99,6 +100,11 @@ namespace ch {
 
             // Send poll request
             bool pollRequest() const;
+
+#ifdef MULTIPLE_MAPPER
+            // Mutex
+            std::mutex lock;
+#endif
         public:
 
             // Constructor for worker

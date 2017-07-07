@@ -49,11 +49,16 @@ bool runJob(const ipconfig_t & ips, ch::SourceManager & source, const std::strin
             I("Please implement doJob function in the library.");
             return false;
         } else {
+#ifdef MULTIPLE_MAPPER
+            ch::context_t context(ips, source, outputFilePath, workingDir, isServer, true);
+#else
             ch::context_t context(ips, source, outputFilePath, workingDir, isServer);
+#endif
             if (!doJob(context)) {
                 dlclose(jobLib);
                 return false;
             }
+            P("Finish one job.");
         }
         dlclose(jobLib);
         return true;
@@ -63,7 +68,7 @@ bool runJob(const ipconfig_t & ips, ch::SourceManager & source, const std::strin
 // Run as worker
 bool asWorker(const int sockfd) {
 
-    puts("Running as worker.");
+    P("Running as worker.");
 
     ch::SourceManagerWorker source{sockfd};
 
@@ -168,6 +173,7 @@ void serve(const int sockfd) {
     if (sockfd > 0) { // the socket with the RPC caller
         char c;
         if (ch::precv(sockfd, static_cast<void *>(&c), sizeof(char))) {
+            P("Job accepted.");
             if (c == CALL_MASTER) {
                 if (!asMaster(sockfd)) {
                     ch::sendFail(sockfd);
@@ -205,8 +211,8 @@ int main(int argc, char ** argv) {
     socklen_t s_size;
 
     if (ch::prepareServer(serverfd, SERVER_PORT)) {
+        P("Accepting request.");
         while (1) {
-            P("Accepting request.");
             int sockfd = accept(serverfd, reinterpret_cast<struct sockaddr *>(&remote), &s_size);
             std::thread serve_thread{serve, sockfd};
             serve_thread.detach();
