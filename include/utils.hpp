@@ -43,7 +43,7 @@ namespace ch {
     // kevent wrapper
     int Kevent(int kq, const struct kevent *changelist, int nchanges, struct kevent *eventlist, int nevents, const struct timespec *timeout);
 
-#elif defined (_CH_EPOLL__)
+#elif defined (__CH_EPOLL__)
     // epoll_wait wrapper
     int Epoll_wait(int epfd, struct epoll_event *events, int maxevents, int timeout);
 

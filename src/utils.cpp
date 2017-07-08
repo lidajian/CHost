@@ -70,7 +70,7 @@ namespace ch {
         return rv;
     }
 
-#elif defined (_CH_EPOLL__)
+#elif defined (__CH_EPOLL__)
     // epoll_wait wrapper
     int Epoll_wait(int epfd, struct epoll_event *events, int maxevents, int timeout) {
         int rv;
