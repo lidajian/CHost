@@ -300,12 +300,12 @@ namespace ch {
     template <typename DataType>
     void StreamManager<DataType>::establishConnection(const ipconfig_t & ips, const std::string & jobName){
 
+        selfId = ips[0].first;
+
         if (clusterSize < 2) {
             connected = true;
             return;
         }
-
-        selfId = ips[0].first;
 
         int serverfd;
         if (!prepareServer(serverfd, STREAMMANAGER_PORT)) {
