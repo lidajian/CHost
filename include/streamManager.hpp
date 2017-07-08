@@ -568,7 +568,7 @@ namespace ch {
 #elif defined (__CH_EPOLL__)
                                             struct epoll_event event;
                                             event.events = EPOLLIN;
-                                            event.data = sockfd;
+                                            event.data.fd = sockfd;
                                             epoll_ctl(ep, EPOLL_CTL_ADD, sockfd, &event);
 #else
                                             FD_SET(sockfd, fdset_o);
