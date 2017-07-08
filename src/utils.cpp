@@ -105,7 +105,7 @@ namespace ch {
 
         if (sockfd < 0) {
             sockfd = INVALID_SOCKET;
-            return INVALID;
+            return false;
         }
 
         memset(&addr, 0, sizeof(sockaddr_in));

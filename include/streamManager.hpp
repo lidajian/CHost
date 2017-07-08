@@ -200,6 +200,7 @@ namespace ch {
         for (size_t i = 1; i < numIP; ++i) {
 
             nEvents = Epoll_wait(ep, &event, 1, ACCEPT_TIMEOUT * 1000);
+            // TODO everytime I inpect nEvents, no timeout problem, why???
 
             if (nEvents <= 0) {
                 D("(StreamManager) Server failed to accept all clients within timeout.");
