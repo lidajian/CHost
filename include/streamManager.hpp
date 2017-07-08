@@ -191,6 +191,8 @@ namespace ch {
         struct epoll_event event;
 
         // Register
+        event.events = EPOLLIN;
+        event.data.fd = serverfd;
         if (epoll_ctl(ep, EPOLL_CTL_ADD, serverfd, &event) < 0) {
             close(ep);
             close(serverfd);
@@ -200,7 +202,6 @@ namespace ch {
         for (size_t i = 1; i < numIP; ++i) {
 
             nEvents = Epoll_wait(ep, &event, 1, ACCEPT_TIMEOUT * 1000);
-            // TODO everytime I inpect nEvents, no timeout problem, why???
 
             if (nEvents <= 0) {
                 D("(StreamManager) Server failed to accept all clients within timeout.");
