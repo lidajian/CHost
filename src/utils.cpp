@@ -367,7 +367,7 @@ namespace ch {
     }
 
     // Get working directory, make directory if does not exist
-    bool getWorkingDirectory(std::string & workingDir) {
+    bool getWorkingDirectory(std::string & workingDir, const std::string & additionalDir) {
 
         // create the folder
         const char * homedir = getenv("HOME");
@@ -378,7 +378,11 @@ namespace ch {
         }
         workingDir = homedir;
         workingDir += TEMP_DIR;
-        return Mkdir(workingDir);
+        workingDir += "/" + additionalDir;
+        if (!fileExist(workingDir.c_str())) {
+            return Mkdir(workingDir);
+        }
+        return true;
     }
 
     // Read file as string (cache the file to avoid multiple read)
@@ -502,5 +506,26 @@ namespace ch {
     void sendFail(const int sockfd) {
         const char c = RES_FAIL;
         ch::psend(sockfd, static_cast<const void *>(&c), sizeof(char));
+    }
+
+    /*
+     * Others
+     */
+
+    // Generate random string of length l
+    std::string randomString(size_t l) {
+        std::random_device d;
+        std::default_random_engine generator{d()};
+        std::uniform_int_distribution<char> distribution{'a', 'z'};
+        auto char_dice = std::bind(distribution, generator);
+
+        std::string ret;
+        ret.reserve(l);
+
+        for (size_t i = 0; i < l; ++i) {
+            ret.push_back(char_dice());
+        }
+
+        return ret;
     }
 }

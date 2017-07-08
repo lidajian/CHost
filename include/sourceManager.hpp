@@ -56,7 +56,7 @@ namespace ch {
         public:
 
             // Constructor
-            SourceManagerMaster(const char * dataFile, const std::string & jobFilePath);
+            SourceManagerMaster(const std::string & dataFile, const std::string & jobFilePath);
 
             // Copy constructor (deleted)
             SourceManagerMaster(const SourceManagerMaster &) = delete;
@@ -74,7 +74,7 @@ namespace ch {
             ~SourceManagerMaster();
 
             // Connect to workers and deliver files
-            bool connectAndDeliver(const ipconfig_t & ips, unsigned short port = SERVER_PORT);
+            bool connectAndDeliver(const ipconfig_t & ips, const std::string & jobName, unsigned short port = SERVER_PORT);
 
             // Start distribution thread
             void startDistributionThread();
@@ -125,7 +125,7 @@ namespace ch {
             // Receive resource files
             // 1. Configuration file
             // 2. Job file
-            bool receiveFiles(const std::string & confFilePath, const std::string & jobFilePath);
+            bool receiveFiles(std::string & confFilePath, std::string & jobFilePath, std::string & jobName, std::string & workingDir);
 
             bool isValid() const;
 

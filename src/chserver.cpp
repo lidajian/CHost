@@ -1,6 +1,6 @@
 #include <sys/socket.h> // accept
 #include <dlfcn.h> // dlopen, dlsym, dlclose
-#include <unistd.h> // unlink, close
+#include <unistd.h> // close
 
 #include <string> // string
 #include <thread> // thread
@@ -10,9 +10,6 @@
 #include "job.hpp"
 
 // TODO fault tolerence (error process)
-// TODO multi-thread
-std::string confFilePath;
-std::string workingDir;
 
 int serverfd = INVALID_SOCKET;
 
@@ -37,7 +34,7 @@ void closefd() {
 }
 
 // Get job function from job library and run the job
-bool runJob(const ipconfig_t & ips, ch::SourceManager & source, const std::string & outputFilePath, const std::string & jobFilePath, const bool isServer) {
+bool runJob(const std::string & jobFilePath, ch::context_t & context) {
     void * jobLib = dlopen(jobFilePath.c_str(), RTLD_LAZY);
     if (jobLib == nullptr) {
         E("Cannot find library file.");
@@ -49,16 +46,10 @@ bool runJob(const ipconfig_t & ips, ch::SourceManager & source, const std::strin
             I("Please implement doJob function in the library.");
             return false;
         } else {
-#ifdef MULTIPLE_MAPPER
-            ch::context_t context(ips, source, outputFilePath, workingDir, isServer, true);
-#else
-            ch::context_t context(ips, source, outputFilePath, workingDir, isServer);
-#endif
             if (!doJob(context)) {
                 dlclose(jobLib);
                 return false;
             }
-            P("Finish one job.");
         }
         dlclose(jobLib);
         return true;
@@ -73,21 +64,25 @@ bool asWorker(const int sockfd) {
     ch::SourceManagerWorker source{sockfd};
 
     if (source.isValid()) {
-        std::string jobFilePath = workingDir + JOB_FILE;
-        if (source.receiveFiles(confFilePath, jobFilePath)) {
+        std::string jobFilePath;
+        std::string jobName;
+        std::string confFilePath;
+        std::string workingDir;
+        if (source.receiveFiles(confFilePath, jobFilePath, jobName, workingDir)) {
             ipconfig_t ips;
             if (ch::readIPs(confFilePath, ips)) {
                 // do job
-                unlink(confFilePath.c_str());
                 const std::string outputFilePath;
-                return runJob(ips, source, outputFilePath, jobFilePath, false);
+#ifdef MULTIPLE_MAPPER
+                ch::context_t context(ips, source, outputFilePath, workingDir, jobName, false, true);
+#else
+                ch::context_t context(ips, source, outputFilePath, workingDir, jobName, false, false);
+#endif
+                return runJob(jobFilePath, context);
             } else {
-                unlink(confFilePath.c_str());
                 E("Cannot read configuration file.");
             }
-            unlink(jobFilePath.c_str());
         } else {
-            unlink(jobFilePath.c_str());
             E("Cannot receive configuration file and job file.");
         }
     } else {
@@ -99,11 +94,10 @@ bool asWorker(const int sockfd) {
 // Run as master
 bool asMaster(int sockfd) {
 
-    P("Running as master.");
-
     std::string dataFilePath;
     std::string outputFilePath;
     std::string jobFilePath;
+    std::string jobName;
 
     /*
      * Receive parameter from starter
@@ -120,25 +114,35 @@ bool asMaster(int sockfd) {
         E("Cannot receive job file path.");
         return false;
     }
+    if (!ch::receiveString(sockfd, jobName)) {
+        E("Cannot receive job name.");
+        return false;
+    }
+
+    std::string workingDir;
+
+    ch::getWorkingDirectory(workingDir, jobName);
+
+    PSS("Running as master on " << jobName << ".");
+
+    std::string confFilePath = workingDir + IPCONFIG_FILE;
 
     ipconfig_t ips;
     if (!ch::readIPs(confFilePath, ips)) {
         E("Cannot read configuration file.");
-        unlink(confFilePath.c_str());
         return false;
     }
-    unlink(confFilePath.c_str());
 
     if (ips.empty()) {
         E("Configuration file contains no IP information.");
         return false;
     }
 
-    ch::SourceManagerMaster source{dataFilePath.c_str(), jobFilePath};
+    ch::SourceManagerMaster source{dataFilePath, jobFilePath};
 
     if (source.isValid()) {
 
-        if (!source.connectAndDeliver(ips)) {
+        if (!source.connectAndDeliver(ips, jobName)) {
             E("Fail to connect to workers.");
             return false;
         }
@@ -146,11 +150,17 @@ bool asMaster(int sockfd) {
         source.startDistributionThread();
 
         // do job
-
-        if (!runJob(ips, source, outputFilePath, jobFilePath, true)) {
-            E("Job on master failed.");
+#ifdef MULTIPLE_MAPPER
+        ch::context_t context(ips, source, outputFilePath, workingDir, jobName, true, true);
+#else
+        ch::context_t context(ips, source, outputFilePath, workingDir, jobName, true, false);
+#endif
+        if (!runJob(jobFilePath, context)) {
+            ESS("Job " << jobName << " on master failed.");
             return false;
         }
+
+        PSS("Finish job " << jobName << ".");
 
         source.blockTillDistributionThreadsEnd();
 
@@ -197,12 +207,6 @@ void serve(const int sockfd) {
 }
 
 int main(int argc, char ** argv) {
-
-    if (!ch::getWorkingDirectory(workingDir)) {
-        return 0;
-    }
-
-    confFilePath = workingDir + IPCONFIG_FILE;
 
     std::set_terminate(closefd);
     signal(SIGINT, sigintHandler);

@@ -92,6 +92,9 @@ namespace ch {
 
             // Send data through socket
             bool send(const DataType & v) const ;
+
+            // Send string through socket
+            bool sendString(const std::string & str) const ;
     };
 
     /*
@@ -220,6 +223,12 @@ namespace ch {
             DSS("ObjectOutputStream: Failed sending " << v);
         }
         return false;
+    }
+
+    // Send string through socket
+    template <typename DataType>
+    bool ObjectOutputStream<DataType>::sendString(const std::string & str) const {
+        return ch::sendString(_sockfd, str);
     }
 
     // From value

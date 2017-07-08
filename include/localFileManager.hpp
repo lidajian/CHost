@@ -10,14 +10,13 @@
 #include <vector> // vector
 #include <string> // string
 #include <fstream> // ofstream
-#include <random> // random_device, default_random_engine, uniform_int_distribution
-#include <functional> // std::bind
 #include <thread> // sleep_for
 #include <chrono> // seconds
 
 #include "def.hpp" // RANDOM_FILE_NAME_LENGTH
 #include "sortedStream.hpp" // SortedStream
 #include "unsortedStream.hpp" // UnsortedStream
+#include "utils.hpp"
 
 namespace ch {
 
@@ -230,17 +229,10 @@ namespace ch {
     // Get output file stream of a new temporary file
     template <typename DataType>
     void LocalFileManager<DataType>::getStream(std::ofstream & os) {
-        // generate random file name
-        std::random_device d;
-        std::default_random_engine generator{d()};
-        std::uniform_int_distribution<char> distribution{'a', 'z'};
-        auto char_dice = std::bind(distribution, generator);
         dumpFiles.emplace_back(dumpFileDir);
         std::string & fullPath = dumpFiles.back();
         fullPath.append("/.", LENGTH_CONST_CHAR_ARRAY("/."));
-        for (int i = 0; i < RANDOM_FILE_NAME_LENGTH; ++i) {
-            fullPath.push_back(char_dice());
-        }
+        fullPath += randomString(RANDOM_FILE_NAME_LENGTH);
         os.open(fullPath);
         if (!os) {
             dumpFiles.pop_back();

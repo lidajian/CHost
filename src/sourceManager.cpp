@@ -13,9 +13,9 @@ namespace ch {
     }
 
     // Constructor
-    SourceManagerMaster::SourceManagerMaster(const char * dataFile, const std::string & jobFilePath): _jobFilePath{jobFilePath} {
+    SourceManagerMaster::SourceManagerMaster(const std::string & dataFile, const std::string & jobFilePath): _jobFilePath{jobFilePath} {
         if (ch::readFileAsString(jobFilePath.c_str(), _jobFileContent)) {
-            if (splitter.open(dataFile)) {
+            if (splitter.open(dataFile.c_str())) {
                 D("(SourceManagerMaster) Fail to open data file.");
             }
         } else {
@@ -33,7 +33,7 @@ namespace ch {
     }
 
     // Connect to workers and deliver files
-    bool SourceManagerMaster::connectAndDeliver(const ipconfig_t & ips, unsigned short port) {
+    bool SourceManagerMaster::connectAndDeliver(const ipconfig_t & ips, const std::string & jobName, unsigned short port) {
         size_t l = ips.size();
         if (l == 0) {
             return false;
@@ -44,7 +44,7 @@ namespace ch {
             ThreadPool threadPool{MIN_VAL(THREAD_POOL_SIZE, nConnections)};
             for (size_t i = 1; i < l; ++i) {
                 int & sockfd = connections[i];
-                threadPool.addTask([i, &ips, port, &sockfd, this](){ // Start connection threads
+                threadPool.addTask([i, &ips, port, &sockfd, &jobName, this](){ // Start connection threads
 
                     const std::string & ip = ips[i].second;
 
@@ -58,6 +58,13 @@ namespace ch {
                     // create client on clients
                     if(!invokeWorker(sockfd)) {
                         ESS("(SourceManagerMaster) Cannot invoke worker on " << ip);
+                        close(sockfd);
+                        sockfd = INVALID_SOCKET;
+                        return;
+                    }
+
+                    // Send job name
+                    if (!sendString(sockfd, jobName)) {
                         close(sockfd);
                         sockfd = INVALID_SOCKET;
                         return;
@@ -408,11 +415,20 @@ namespace ch {
     // Receive resource files
     // 1. Configuration file
     // 2. Job file
-    bool SourceManagerWorker::receiveFiles(const std::string & confFilePath, const std::string & jobFilePath) {
+    bool SourceManagerWorker::receiveFiles(std::string & confFilePath, std::string & jobFilePath, std::string & jobName, std::string & workingDir) {
         if (!isValid()) {
             D("(SourceManagerWorker) The socket failed.");
             return false;
         }
+        if (!receiveString(fd, jobName)) {
+            E("Fail to receive job name.");
+            return false;
+        }
+        if (!getWorkingDirectory(workingDir, jobName)) {
+            return false;
+        }
+        confFilePath = workingDir + IPCONFIG_FILE;
+        jobFilePath = workingDir + JOB_FILE;
         if (!receiveFile(fd, confFilePath.c_str())) {
             E("Fail to receive configuration file.");
             return false;

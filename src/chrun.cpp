@@ -118,18 +118,25 @@ int main(int argc, char ** argv) {
         return 0;
     }
     if (!ch::fileExist(jobFilePath.c_str())) {
-        E("The job file exists.");
+        E("The job file does not exist.");
         I("Please specify a valid job file path.");
         return 0;
     }
 
     // Create configuration file
+    const std::string & jobName = ch::randomString(RANDOM_JOB_NAME_LENGTH);
     std::string workingDir;
-    ch::getWorkingDirectory(workingDir);
+
+    if (!ch::getWorkingDirectory(workingDir, jobName)) {
+        E("The job exists.");
+        I("Try again later.");
+        return 0;
+    }
+
     targetConfFilePath = workingDir + IPCONFIG_FILE;
     if (!createTargetConfigurationFile(confFilePath, targetConfFilePath)) {
         E("Cannot create configuration file for server.");
-        I("1. The configuration file may not be well formated.");
+        I("1. The configuration file may not be well formatted.");
         I("2. The configuration file in working directory may exist, try to clean the working directory.");
         return 0;
     }
@@ -166,6 +173,12 @@ int main(int argc, char ** argv) {
         close(sockfd);
         return 0;
     }
+    if (!ch::sendString(sockfd, jobName)) {
+        E("Failed sending job name.");
+        I("There may be an error on server and the server may terminate unexpectedly.");
+        close(sockfd);
+        return 0;
+    }
 
     // Timing job
 
@@ -173,7 +186,7 @@ int main(int argc, char ** argv) {
 
     system_clock::time_point start = system_clock::now();
 
-    P("Job started.");
+    std::cout << "Job " << jobName << " started.\n";
 
     getResult(sockfd);
 

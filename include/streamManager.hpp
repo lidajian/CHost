@@ -58,24 +58,24 @@ namespace ch {
             const Partitioner * _partitioner;
 
             // Server thread: accept connections
-            static void serverThread(int serverfd, const ipconfig_t & ips, std::vector<ObjectInputStream<DataType> *> & istreams, std::vector<int> & connections);
+            static void serverThread(int serverfd, const ipconfig_t & ips, std::vector<ObjectInputStream<DataType> *> & istreams, std::vector<int> & connections, const std::string & jobName);
 
             // Connect thread: connect to servers
             // sets stmr to the created object output stream if success
-            static void connectThread(const std::string & ip, ObjectOutputStream<DataType> * & stmr);
+            static void connectThread(const std::string & ip, ObjectOutputStream<DataType> * & stmr, const std::string & jobName);
 
             // Close and clear all streams
             void clearStreams();
 
             // Initialize streams
             // Accept and connect to all machines
-            void establishConnection(const ipconfig_t & ips);
+            void establishConnection(const ipconfig_t & ips, const std::string & jobName);
         public:
             // Constructor: given directory of configuration
-            StreamManager(const std::string & configureFile, const std::string & dir, size_t maxDataSize = DEFAULT_MAX_DATA_SIZE, bool presort = true, const Partitioner & partitioner = hashPartitioner);
+            StreamManager(const std::string & configureFile, const std::string & dir, const std::string & jobName, size_t maxDataSize = DEFAULT_MAX_DATA_SIZE, bool presort = true, const Partitioner & partitioner = hashPartitioner);
 
             // Constructor: given vector of IP configuration
-            StreamManager(const ipconfig_t & ips, const std::string & dir, size_t maxDataSize = DEFAULT_MAX_DATA_SIZE, bool presort = true, const Partitioner & partitioner = hashPartitioner);
+            StreamManager(const ipconfig_t & ips, const std::string & dir, const std::string & jobName, size_t maxDataSize = DEFAULT_MAX_DATA_SIZE, bool presort = true, const Partitioner & partitioner = hashPartitioner);
 
             // Copy constructor (deleted)
             StreamManager(const StreamManager<DataType> &) = delete;
@@ -136,7 +136,9 @@ namespace ch {
 
     // Server thread: accept connections
     template <typename DataType>
-    void StreamManager<DataType>::serverThread(int serverfd, const ipconfig_t & ips, std::vector<ObjectInputStream<DataType> *> & istreams, std::vector<int> & connections) {
+    void StreamManager<DataType>::serverThread(int serverfd, const ipconfig_t & ips, std::vector<ObjectInputStream<DataType> *> & istreams, std::vector<int> & connections, const std::string & jobName) {
+
+        std::string remoteJobName;
 
         sockaddr_in remote;
         socklen_t s_size;
@@ -225,7 +227,10 @@ namespace ch {
             } else {
 #endif
                 int sockfd = accept(serverfd, reinterpret_cast<struct sockaddr *>(&remote), &s_size);
-                if (sockfd > 0 && (getpeername(sockfd, reinterpret_cast<struct sockaddr *>(&remote), &s_size) >= 0)) {
+                if (sockfd > 0 &&
+                    (getpeername(sockfd, reinterpret_cast<struct sockaddr *>(&remote), &s_size) >= 0) &&
+                    receiveString(sockfd, remoteJobName) &&
+                    (remoteJobName.compare(jobName) == 0)) {
                     PSS("(StreamManager) Server accepted connection from " << inet_ntoa(remote.sin_addr));
                     connections.push_back(sockfd);
                     ObjectInputStream<DataType> * stm = new ObjectInputStream<DataType>(sockfd);
@@ -250,7 +255,7 @@ namespace ch {
     // Connect thread: connect to servers
     // sets stmr to the created object output stream if success
     template <typename DataType>
-    void StreamManager<DataType>::connectThread(const std::string & ip, ObjectOutputStream<DataType> * & stmr) {
+    void StreamManager<DataType>::connectThread(const std::string & ip, ObjectOutputStream<DataType> * & stmr, const std::string & jobName) {
         ObjectOutputStream<DataType> * stm = new ObjectOutputStream<DataType>{};
         int tries = 0;
         while (tries < MAX_CONNECTION_ATTEMPT && !(stm->open(ip, STREAMMANAGER_PORT))) {
@@ -260,6 +265,9 @@ namespace ch {
             std::this_thread::sleep_for(std::chrono::seconds(CONNECTION_RETRY_INTERVAL));
         }
         if (tries == MAX_CONNECTION_ATTEMPT) {
+            ESS("(StreamManager) Client fail to connect to " << ip);
+            delete stm;
+        } else if (!stm->sendString(jobName)) {
             ESS("(StreamManager) Client fail to connect to " << ip);
             delete stm;
         } else {
@@ -290,7 +298,7 @@ namespace ch {
     // Initialize streams
     // Accept and connect to all machines
     template <typename DataType>
-    void StreamManager<DataType>::establishConnection(const ipconfig_t & ips){
+    void StreamManager<DataType>::establishConnection(const ipconfig_t & ips, const std::string & jobName){
 
         if (clusterSize < 2) {
             connected = true;
@@ -314,11 +322,11 @@ namespace ch {
         ThreadPool threadPool{MIN_VAL(THREAD_POOL_SIZE, clusterSize)};
 
         // create server thread to accept connection
-        threadPool.addTask(serverThread, serverfd, std::ref(ips), std::ref(istreams), std::ref(connections));
+        threadPool.addTask(serverThread, serverfd, std::ref(ips), std::ref(istreams), std::ref(connections), std::ref(jobName));
 
         // create connect thread to connect to server
         for (size_t i = 1; i < clusterSize; ++i) {
-            threadPool.addTask(connectThread, std::ref(ips[i].second), std::ref(ostreams[ips[i].first]));
+            threadPool.addTask(connectThread, std::ref(ips[i].second), std::ref(ostreams[ips[i].first]), std::ref(jobName));
         }
 
         threadPool.stop();
@@ -345,7 +353,7 @@ namespace ch {
 
     // Constructor: given directory of configuration
     template <typename DataType>
-    StreamManager<DataType>::StreamManager(const std::string & configureFile, const std::string & dir, size_t maxDataSize, bool presort, const Partitioner & partitioner):
+    StreamManager<DataType>::StreamManager(const std::string & configureFile, const std::string & dir, const std::string & jobName, size_t maxDataSize, bool presort, const Partitioner & partitioner):
         connected{false}, receiveThread{nullptr}, _data{dir, maxDataSize, presort}, _partitioner{&partitioner} {
         ipconfig_t ips;
         if (!readIPs(configureFile, ips)) {
@@ -353,7 +361,7 @@ namespace ch {
         }
         clusterSize = ips.size();
         if (clusterSize > 0) {
-            establishConnection(ips);
+            establishConnection(ips, jobName);
         } else {
             E("(StreamManager) Empty configuration.");
         }
@@ -361,10 +369,10 @@ namespace ch {
 
     // Constructor: given vector of IP configuration
     template <typename DataType>
-    StreamManager<DataType>::StreamManager(const ipconfig_t & ips, const std::string & dir, size_t maxDataSize, bool presort, const Partitioner & partitioner):
+    StreamManager<DataType>::StreamManager(const ipconfig_t & ips, const std::string & dir, const std::string & jobName, size_t maxDataSize, bool presort, const Partitioner & partitioner):
         clusterSize{ips.size()}, connected{false}, receiveThread{nullptr}, _data{dir, maxDataSize, presort}, _partitioner{&partitioner} {
         if (clusterSize > 0) {
-            establishConnection(ips);
+            establishConnection(ips, jobName);
         } else {
             E("(StreamManager) Empty configuration.");
         }

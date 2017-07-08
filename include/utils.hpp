@@ -16,6 +16,8 @@
 #include <fstream> // ifstream
 #include <string> // string
 #include <vector> // vector
+#include <random> // random_device, default_random_engine, uniform_int_distribution, ...
+#include <functional> // std::bind
 
 #include "def.hpp"
 
@@ -97,7 +99,7 @@ namespace ch {
     bool readFileAsString(const char * file_path, std::string & str);
 
     // Get working directory, make directory if does not exist
-    bool getWorkingDirectory(std::string & workingDir);
+    bool getWorkingDirectory(std::string & workingDir, const std::string & addictionalDir);
 
     /*
      * Mimic command
@@ -124,6 +126,13 @@ namespace ch {
 
     // Return fail to chrun program
     void sendFail(const int sockfd);
+
+    /*
+     * Others
+     */
+
+    // Generate random string of length l
+    std::string randomString(size_t l);
 }
 
 #endif

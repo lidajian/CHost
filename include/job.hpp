@@ -24,6 +24,7 @@ namespace ch {
         ch::SourceManager & _source;
         const std::string & _outputFilePath;
         const std::string & _workingDir;
+        const std::string & _jobName;
         const bool _isServer;
         const bool _supportMultipleMapper;
 
@@ -31,8 +32,9 @@ namespace ch {
                            ch::SourceManager & source,
                            const std::string & outputFilePath,
                            const std::string & workingDir,
+                           const std::string & jobName,
                            const bool isServer = false,
-                           const bool supportMultipleMapper = false): _ips(ips), _source(source), _outputFilePath(outputFilePath), _workingDir(workingDir), _isServer(isServer), _supportMultipleMapper(supportMultipleMapper) {}
+                           const bool supportMultipleMapper = false): _ips(ips), _source(source), _outputFilePath(outputFilePath), _workingDir(workingDir), _jobName(jobName), _isServer(isServer), _supportMultipleMapper(supportMultipleMapper) {}
     };
 
     // Job function type
@@ -63,7 +65,7 @@ namespace ch {
     template <typename MapperReducerOutputType>
     bool simpleJob(context_t & context) {
 
-        StreamManager<MapperReducerOutputType> stm{context._ips, context._workingDir, DEFAULT_MAX_DATA_SIZE};
+        StreamManager<MapperReducerOutputType> stm{context._ips, context._workingDir, context._jobName, DEFAULT_MAX_DATA_SIZE};
 
         if (!stm.isConnected()) { // Not connected
             E("(Job) StreamManager connect failed. Nothing done.");
@@ -143,7 +145,7 @@ namespace ch {
     template <typename MapperOutputType, typename ReducerOutputType>
     bool completeJob(context_t & context) {
 
-        StreamManager<MapperOutputType> stm_mapper{context._ips, context._workingDir, DEFAULT_MAX_DATA_SIZE};
+        StreamManager<MapperOutputType> stm_mapper{context._ips, context._workingDir, context._jobName, DEFAULT_MAX_DATA_SIZE};
 
         if (!stm_mapper.isConnected()) { // Not connected
             E("(Job) StreamManager connect failed. Nothing done.");
@@ -193,7 +195,7 @@ namespace ch {
         SortedStream<MapperOutputType> * sorted = stm_mapper.getSortedStream();
         std::unique_ptr<SortedStream<MapperOutputType> > _sorted{sorted};
 
-        StreamManager<ReducerOutputType> stm_reducer{context._ips, context._workingDir, DEFAULT_MAX_DATA_SIZE, false};
+        StreamManager<ReducerOutputType> stm_reducer{context._ips, context._workingDir, context._jobName, DEFAULT_MAX_DATA_SIZE, false};
 
         if (!stm_reducer.isConnected()) { // Not connected
             E("(Job) StreamManager connect failed. Fail to perform reduce on this machine.");
