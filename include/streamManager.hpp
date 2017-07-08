@@ -319,15 +319,17 @@ namespace ch {
         connections.reserve(clusterSize - 1);
         ostreams.clear();
         ostreams.resize(clusterSize, nullptr);
-        ThreadPool threadPool{MIN_VAL(THREAD_POOL_SIZE, clusterSize)};
+        ThreadPool threadPool{MIN_VAL(THREAD_POOL_SIZE, clusterSize - 1)};
 
         // create server thread to accept connection
-        threadPool.addTask(serverThread, serverfd, std::ref(ips), std::ref(istreams), std::ref(connections), std::ref(jobName));
+        std::thread sthread{serverThread, serverfd, std::ref(ips), std::ref(istreams), std::ref(connections), std::ref(jobName)};
 
         // create connect thread to connect to server
         for (size_t i = 1; i < clusterSize; ++i) {
             threadPool.addTask(connectThread, std::ref(ips[i].second), std::ref(ostreams[ips[i].first]), std::ref(jobName));
         }
+
+        sthread.join();
 
         threadPool.stop();
 
