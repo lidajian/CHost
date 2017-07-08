@@ -1,6 +1,7 @@
 #include <sys/socket.h> // accept
 #include <dlfcn.h> // dlopen, dlsym, dlclose
 #include <unistd.h> // close
+#include <signal.h> // signal
 
 #include <string> // string
 #include <thread> // thread
