@@ -5,21 +5,27 @@
 #ifndef SOURCE_MANAGER_H
 #define SOURCE_MANAGER_H
 
-#include <thread> // thread
-#include <vector> // vector
-#include <string> // string
-#include <atomic> // atomic_uint
-#include <unordered_map> // unordered_map
-#include <mutex> // mutex
+#include <unistd.h>       // close
 
-#include "splitter.hpp" // Splitter
-#include "utils.hpp" // sconnect, invokeWorker
+#include <thread>         // thread
+#include <vector>         // vector
+#include <string>         // string, to_string
+#include <atomic>         // atomic_uint
+#include <unordered_map>  // unordered_map
+#include <mutex>          // mutex
+
+#include "def.hpp"        // ipconfig_t
+#include "splitter.hpp"   // Splitter
+#include "utils.hpp"      // sconnect, getWorkingDirectory, receiveFile, invokeWorker,
+                          // readFileAsString, sconnect, sendString, precv, psend
 #include "threadPool.hpp" // ThreadPool
 
 namespace ch {
 
     class SourceManager {
+
         public:
+
             // True if the source manager is good
             virtual bool isValid() const = 0;
 
@@ -31,7 +37,9 @@ namespace ch {
      * SourceManagerMaster: source manager for master
      */
     class SourceManagerMaster: public SourceManager {
+
         protected:
+
             // Splitter for data file
             Splitter splitter;
 
@@ -94,17 +102,20 @@ namespace ch {
      * SourceManagerWorker: source manager for workers
      */
     class SourceManagerWorker: public SourceManager {
+
         protected:
+
             // Socket file descriptor
             int fd;
+
+#ifdef MULTIPLE_MAPPER
+            // Mutex for poll
+            std::mutex lock;
+#endif
 
             // Send poll request
             bool pollRequest() const;
 
-#ifdef MULTIPLE_MAPPER
-            // Mutex
-            std::mutex lock;
-#endif
         public:
 
             // Constructor for worker

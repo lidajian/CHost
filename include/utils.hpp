@@ -5,21 +5,20 @@
 #ifndef UTILS_H
 #define UTILS_H
 
-#include <string.h> // memset
-#include <unistd.h> // access
+#include <string.h>     // memset
+#include <unistd.h>     // access
 #include <netinet/in.h> // sockaddr_in
-#include <arpa/inet.h> // htons, inet_addr
+#include <arpa/inet.h>  // htons, inet_addr
 #include <sys/socket.h> // connect, bind, send, recv, socket, listen
-#include <sys/stat.h> // mkdir
-#include <stdio.h> // fseek, ftell, rewind, fread, ...
+#include <sys/stat.h>   // mkdir
+#include <stdio.h>      // fseek, ftell, rewind, fread, fwrite, fclose
 
-#include <fstream> // ifstream
-#include <string> // string
-#include <vector> // vector
-#include <random> // random_device, default_random_engine, uniform_int_distribution, ...
-#include <functional> // std::bind
+#include <fstream>      // ifstream
+#include <string>       // string
+#include <random>       // random_device, default_random_engine, uniform_int_distribution
+#include <functional>   // bind
 
-#include "def.hpp"
+#include "def.hpp"      // select/kqueue/epoll header
 
 namespace ch {
 
@@ -39,6 +38,10 @@ namespace ch {
     // fread with given length
     bool pfread(FILE * fd, void * buffer, size_t len);
 
+    /*
+     * Network functions
+     */
+
 #if defined (__CH_KQUEUE__)
     // kevent wrapper
     int Kevent(int kq, const struct kevent *changelist, int nchanges, struct kevent *eventlist, int nevents, const struct timespec *timeout);
@@ -52,10 +55,6 @@ namespace ch {
     int Select(int nfds, fd_set * readfds, fd_set * writefds, fd_set * errorfds, struct timeval * timeout);
 
 #endif
-
-    /*
-     * Network functions
-     */
 
     // Connect to an address: port
     bool sconnect(int & sockfd, const char * ip, const unsigned short port);

@@ -5,17 +5,20 @@
 #ifndef SPLITTER_H
 #define SPLITTER_H
 
-#include <stdio.h> // fopen, fread, ...
+#include <stdio.h>   // FILE, fopen
 
-#include <mutex> // mutex
-#include <string.h> // memmove
+#include <mutex>     // mutex, lock_guard
+#include <string.h>  // memmove
 
-#include "def.hpp"
+#include "def.hpp"   // DATA_BLOCK_SIZE, IS_ESCAPER
+#include "utils.hpp" // pfread
 
 namespace ch {
 
     class Splitter {
+
         protected:
+
             // The file descriptor it holds
             FILE * _fd;
 
@@ -29,6 +32,7 @@ namespace ch {
             size_t bufferedLength;
 
         public:
+
             // Default constructor
             Splitter();
 

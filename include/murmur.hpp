@@ -1,15 +1,17 @@
 /*
  * Murmur hashing
  */
+
 #ifndef MURMUR_H
 #define MURMUR_H
 
-#include <string>
+#include <string> // string
 
 namespace ch {
 
     template <typename T>
     int murmur2(const T & v) {
+
         const unsigned int seed = 0x82b19283;
         const unsigned int m = 0x5bd1e995;
         const int r = 24;
@@ -52,6 +54,7 @@ namespace ch {
 
     template <>
     int murmur2(const std::string & v) {
+
         const unsigned int seed = 0x82b19283;
         const unsigned int m = 0x5bd1e995;
         const int r = 24;

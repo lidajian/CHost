@@ -7,9 +7,9 @@
 
 #include <unistd.h> // unlink
 
-#include <vector> // vector
-#include <string> // string
-#include <fstream> // ifstream
+#include <vector>   // vector
+#include <string>   // string
+#include <fstream>  // ifstream
 
 namespace ch {
 
@@ -19,7 +19,9 @@ namespace ch {
 
     template <typename DataType>
     class UnsortedStream {
+
         protected:
+
             // Files it manages
             const std::vector<std::string> _files;
 
@@ -28,6 +30,7 @@ namespace ch {
 
             // Input stream of current file
             std::ifstream is;
+
         public:
 
             // Constructor
@@ -61,40 +64,53 @@ namespace ch {
 
     // Constructor
     template <typename DataType>
-    UnsortedStream<DataType>::UnsortedStream(std::vector<std::string> && files): _files(std::move(files)) {
+    UnsortedStream<DataType>::UnsortedStream(std::vector<std::string> && files)
+    : _files(std::move(files)) {
+
         i = 0;
+
         while (!isValid() && i < _files.size()) {
             is.close();
             is.open(_files[i++]);
         }
+
         files.clear();
+
     }
 
     // Move constructor
     template <typename DataType>
-    UnsortedStream<DataType>::UnsortedStream(UnsortedStream<DataType> && o): _files{std::move(o._files)}, i{o.i}, is{std::move(o.is)} {}
+    UnsortedStream<DataType>::UnsortedStream(UnsortedStream<DataType> && o)
+    : _files{std::move(o._files)}, i{o.i}, is{std::move(o.is)} {}
 
     // Move assignment
     template <typename DataType>
-    UnsortedStream<DataType> & UnsortedStream<DataType>::operator = (UnsortedStream<DataType> && o) {
+    UnsortedStream<DataType> &
+        UnsortedStream<DataType>::operator = (UnsortedStream<DataType> && o) {
+
         _files = std::move(o._files);
         i = o.i;
         is = std::move(o.is);
         return *this;
+
     }
 
     // Destructor
     template <typename DataType>
     UnsortedStream<DataType>::~UnsortedStream() {
+
         for (const std::string & file: _files) {
             unlink(file.c_str());
         }
+
     }
 
     // True if stream is good
     template <typename DataType>
     inline bool UnsortedStream<DataType>::isValid() {
+
         return bool(is);
+
     }
 
     // Get data from stream
@@ -109,7 +125,9 @@ namespace ch {
                 return false;
             }
         }
+
         return true;
+
     }
 
 }

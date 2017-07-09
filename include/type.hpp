@@ -1,18 +1,17 @@
 /*
  * Definition of types
  */
+
 #ifndef TYPE_HPP
 #define TYPE_HPP
 
-#include <assert.h>
+#include <string>     // string, to_string
+#include <iostream>   // ostream
+#include <fstream>    // ifstream, ofstream
 
-#include <string> // string
-#include <iostream> // ostream
-#include <fstream> // ifstream, ofstream
-
-#include "def.hpp"
-#include "utils.hpp"
-#include "murmur.hpp"
+#include "def.hpp"    // ID_xxx
+#include "utils.hpp"  // precv, psend, sendString, receiveString
+#include "murmur.hpp" // murmur2
 
 namespace ch {
     const int PRIME = 31;
@@ -20,7 +19,9 @@ namespace ch {
     typedef unsigned char id_t;
 
     class TypeBase {
+
         public:
+
             virtual ~TypeBase() {}
 
             // Get id of the object
@@ -70,7 +71,9 @@ namespace ch {
     }
 
     class Integer: public TypeBase {
+
         public:
+
             int value;
 
             // From value
@@ -140,11 +143,15 @@ namespace ch {
     };
 
     class String: public TypeBase {
+
         protected:
+
             bool hashGot;
 
             int hash;
+
         public:
+
             std::string value;
 
             // Default constructor
@@ -160,7 +167,8 @@ namespace ch {
             String(const String & str): hashGot{str.hashGot}, hash{str.hash}, value{str.value} {}
 
             // Move constructor
-            String(String && str): hashGot{str.hashGot}, hash{str.hash}, value{std::move(str.value)} {
+            String(String && str)
+            : hashGot{str.hashGot}, hash{str.hash}, value{std::move(str.value)} {
                 str.hashGot = false;
             }
 
@@ -248,7 +256,9 @@ namespace ch {
 
     template <typename DataType_1, typename DataType_2>
     class Tuple: public TypeBase {
+
         public:
+
             DataType_1 first;
             DataType_2 second;
 
@@ -259,13 +269,15 @@ namespace ch {
             Tuple(const DataType_1 & v1, const DataType_2 & v2): first{v1}, second{v2} {}
 
             // From rvalues
-            Tuple(DataType_1 && v1, DataType_2 && v2): first{std::move(v1)}, second{std::move(v2)} {}
+            Tuple(DataType_1 && v1, DataType_2 && v2)
+            : first{std::move(v1)}, second{std::move(v2)} {}
 
             // Copy constructor
             Tuple(const Tuple<DataType_1, DataType_2> & t): first{t.first}, second{t.second} {}
 
             // Move constructor
-            Tuple(Tuple<DataType_1, DataType_2> && t): first{std::move(t.first)}, second{std::move(t.second)} {}
+            Tuple(Tuple<DataType_1, DataType_2> && t)
+            : first{std::move(t.first)}, second{std::move(t.second)} {}
 
             // Destructor
             ~Tuple() {}

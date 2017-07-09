@@ -34,7 +34,10 @@ namespace ch {
                            const std::string & workingDir,
                            const std::string & jobName,
                            const bool isServer = false,
-                           const bool supportMultipleMapper = false): _ips(ips), _source(source), _outputFilePath(outputFilePath), _workingDir(workingDir), _jobName(jobName), _isServer(isServer), _supportMultipleMapper(supportMultipleMapper) {}
+                           const bool supportMultipleMapper = false)
+        : _ips(ips), _source(source), _outputFilePath(outputFilePath),
+          _workingDir(workingDir), _jobName(jobName), _isServer(isServer),
+          _supportMultipleMapper(supportMultipleMapper) {}
     };
 
     // Job function type
@@ -45,8 +48,10 @@ namespace ch {
      */
     template <typename MapperOutputType>
     void mapper(std::string & block, StreamManager<MapperOutputType> & sm) {
+
         E("Cannot find mapper function.");
         return;
+
     }
 
     /*
@@ -54,8 +59,10 @@ namespace ch {
      */
     template <typename ReducerInputType, typename ReducerOutputType>
     void reducer(SortedStream<ReducerInputType> & ss, StreamManager<ReducerOutputType> & sm) {
+
         E("Cannot find reducer function.");
         return;
+
     }
 
     /*
@@ -65,7 +72,8 @@ namespace ch {
     template <typename MapperReducerOutputType>
     bool simpleJob(context_t & context) {
 
-        StreamManager<MapperReducerOutputType> stm{context._ips, context._workingDir, context._jobName, DEFAULT_MAX_DATA_SIZE};
+        StreamManager<MapperReducerOutputType> stm{context._ips, context._workingDir,
+                                                   context._jobName, DEFAULT_MAX_DATA_SIZE};
 
         if (!stm.isConnected()) { // Not connected
             E("(Job) StreamManager connect failed. Nothing done.");
@@ -90,8 +98,10 @@ namespace ch {
             std::vector<std::thread> mappers;
             std::vector<std::string> polleds(NUM_MAPPER);
             SourceManager & source = context._source;
+
             for (size_t i = 0; i < NUM_MAPPER; ++i) {
                 std::string & polled = polleds[i];
+
                 mappers.emplace_back([&source, &polled, &stm](){
                     while (source.poll(polled)) {
                         mapper(polled, stm);
@@ -103,6 +113,7 @@ namespace ch {
             }
         } else {
             std::string polled;
+
             while (context._source.poll(polled)) {
                 mapper(polled, stm);
             }
@@ -119,7 +130,8 @@ namespace ch {
         stm.startReceive();
 
         if (!stm.isReceiving()) { // Fail to start receive threads
-            E("(Job) StreamManager start receive threads failed. Fail to perform reduce on this machine.");
+            E("(Job) StreamManager start receive threads failed. Fail to perform"
+              " reduce on this machine.");
             return false;
         }
 
@@ -135,7 +147,9 @@ namespace ch {
         if (context._isServer) {
             return stm.pourToTextFile(context._outputFilePath.c_str());
         }
+
         return true;
+
     }
 
     /*
@@ -145,7 +159,8 @@ namespace ch {
     template <typename MapperOutputType, typename ReducerOutputType>
     bool completeJob(context_t & context) {
 
-        StreamManager<MapperOutputType> stm_mapper{context._ips, context._workingDir, context._jobName, DEFAULT_MAX_DATA_SIZE};
+        StreamManager<MapperOutputType> stm_mapper{context._ips, context._workingDir,
+                                                   context._jobName, DEFAULT_MAX_DATA_SIZE};
 
         if (!stm_mapper.isConnected()) { // Not connected
             E("(Job) StreamManager connect failed. Nothing done.");
@@ -170,8 +185,10 @@ namespace ch {
             std::vector<std::thread> mappers;
             std::vector<std::string> polleds(NUM_MAPPER);
             SourceManager & source = context._source;
+
             for (size_t i = 0; i < NUM_MAPPER; ++i) {
                 std::string & polled = polleds[i];
+
                 mappers.emplace_back([&source, &polled, &stm_mapper](){
                     while (source.poll(polled)) {
                         mapper(polled, stm_mapper);
@@ -183,6 +200,7 @@ namespace ch {
             }
         } else {
             std::string polled;
+
             while (context._source.poll(polled)) {
                 mapper(polled, stm_mapper);
             }
@@ -195,7 +213,8 @@ namespace ch {
         SortedStream<MapperOutputType> * sorted = stm_mapper.getSortedStream();
         std::unique_ptr<SortedStream<MapperOutputType> > _sorted{sorted};
 
-        StreamManager<ReducerOutputType> stm_reducer{context._ips, context._workingDir, context._jobName, DEFAULT_MAX_DATA_SIZE, false};
+        StreamManager<ReducerOutputType> stm_reducer{context._ips, context._workingDir,
+                                                context._jobName, DEFAULT_MAX_DATA_SIZE, false};
 
         if (!stm_reducer.isConnected()) { // Not connected
             E("(Job) StreamManager connect failed. Fail to perform reduce on this machine.");
@@ -205,7 +224,8 @@ namespace ch {
         stm_reducer.startReceive();
 
         if (!stm_reducer.isReceiving()) { // Fail to start receive threads
-            E("(Job) StreamManager start receive threads failed. Fail to perform reduce on this machine.");
+            E("(Job) StreamManager start receive threads failed. Fail to perform reduce"
+              " on this machine.");
             return false;
         }
 
@@ -221,7 +241,9 @@ namespace ch {
         if (context._isServer) {
             return stm_reducer.pourToTextFile(context._outputFilePath.c_str());
         }
+
         return true;
+
     }
 }
 

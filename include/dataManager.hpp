@@ -5,13 +5,14 @@
 #ifndef DATAMANAGER_H
 #define DATAMANAGER_H
 
-#include <vector> // vector
-#include <mutex> // mutex
-#include <algorithm> // sort
+#include <vector>               // vector
+#include <string>               // string
+#include <mutex>                // mutex, lock_guard
+#include <algorithm>            // sort
 
 #include "localFileManager.hpp" // LocalFileManager
-#include "sortedStream.hpp" // SortedStream
-#include "unsortedStream.hpp" // UnsortedStream
+#include "sortedStream.hpp"     // SortedStream
+#include "unsortedStream.hpp"   // UnsortedStream
 
 namespace ch {
 
@@ -21,7 +22,9 @@ namespace ch {
 
     template <typename DataType>
     class DataManager {
+
         protected:
+
             // Sort the data before dumping to file
             bool _presort;
 
@@ -42,7 +45,9 @@ namespace ch {
 
             // Dereference pointer and compare
             static bool pointerComp (const DataType * l, const DataType * r);
+
         public:
+
             // Constructor
             explicit DataManager (const std::string & dir, size_t maxDataSize = DEFAULT_MAX_DATA_SIZE, bool presort = true);
 
@@ -83,59 +88,82 @@ namespace ch {
     // Clear the data manager
     template <typename DataType>
     void DataManager<DataType>::clear() {
+
         fileManager.clear();
+
         std::lock_guard<std::mutex> holder{_dataLock};
+
         _data.clear();
+
     }
 
     // Dereference pointer and compare
     template <typename DataType>
     bool DataManager<DataType>::pointerComp (const DataType * l, const DataType * r) {
+
         return (*l) < (*r);
+
     }
 
     // Constructor
     template <typename DataType>
-    DataManager<DataType>::DataManager (const std::string & dir, size_t maxDataSize, bool presort): _presort{presort}, _maxDataSize{maxDataSize}, fileManager{dir} {}
+    DataManager<DataType>::DataManager (const std::string & dir, size_t maxDataSize, bool presort)
+    : _presort{presort}, _maxDataSize{maxDataSize}, fileManager{dir} {}
 
     // Destructor
     template <typename DataType>
     DataManager<DataType>::~DataManager() {
+
         clear();
+
     }
 
     // Store the data on heap
     template <typename DataType>
     bool DataManager<DataType>::store(const DataType * v) {
+
         std::lock_guard<std::mutex> holder{_dataLock};
+
         _data.push_back(v);
+
         if (_data.size() == _maxDataSize) {
             if (_presort) sort(std::begin(_data), std::end(_data), pointerComp);
             return fileManager.dumpToFile(_data);
         }
+
         return true;
+
     }
 
     // Store data on stack
     template <typename DataType>
     bool DataManager<DataType>::store(const DataType & v) {
+
         DataType * nv = new DataType{v};
+
         std::lock_guard<std::mutex> holder{_dataLock};
+
         _data.push_back(nv);
+
         if (_data.size() == _maxDataSize) {
             if (_presort) sort(std::begin(_data), std::end(_data), pointerComp);
             return fileManager.dumpToFile(_data);
         }
+
         return true;
+
     }
 
     // Get sorted stream from file manager
     template <typename DataType>
     SortedStream<DataType> * DataManager<DataType>::getSortedStream() {
-        std::lock_guard<std::mutex> holder{_dataLock};
+
         if (!_presort) {
             return nullptr;
         }
+
+        std::lock_guard<std::mutex> holder{_dataLock};
+
         if (_data.size() != 0) {
             sort(std::begin(_data), std::end(_data), pointerComp);
             if (!fileManager.dumpToFile(_data)) {
@@ -143,25 +171,33 @@ namespace ch {
                 return nullptr;
             }
         }
+
         return fileManager.getSortedStream();
+
     }
 
     // Get unsorted stream from file manager
     template <typename DataType>
     UnsortedStream<DataType> * DataManager<DataType>::getUnsortedStream () {
+
         std::lock_guard<std::mutex> holder{_dataLock};
+
         if (_data.size() != 0) {
             if (!fileManager.dumpToFile(_data)) {
                 E("(DataManager) Fail to dump the remaining data to file.");
                 return nullptr;
             }
         }
+
         return fileManager.getUnsortedStream();
+
     }
 
     template <typename DataType>
     void DataManager<DataType>::setPresort(bool presort) {
+
         _presort = presort;
+
     }
 }
 

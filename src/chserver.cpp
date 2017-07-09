@@ -1,47 +1,60 @@
-#include <sys/socket.h> // accept
-#include <dlfcn.h> // dlopen, dlsym, dlclose
-#include <unistd.h> // close
-#include <signal.h> // signal
+#include <sys/socket.h>      // accept, socklen_t
+#include <dlfcn.h>           // dlopen, dlsym, dlclose
+#include <unistd.h>          // close
+#include <signal.h>          // signal
+#include <stdlib.h>          // exit
+#include <netinet/in.h>      // sockaddr_in
 
-#include <string> // string
-#include <thread> // thread
+#include <string>            // string
+#include <thread>            // thread
 
-#include "utils.hpp"
-#include "sourceManager.hpp"
-#include "job.hpp"
-
-// TODO fault tolerence (error process)
+#include "def.hpp"           // SERVER_PORT
+#include "sourceManager.hpp" // SourceManagerWorker, SourceManagerMaster
+#include "job.hpp"           // job_f, context_t
+#include "utils.hpp"         // readIPs, receiveString, getWorkingDirectory,
+                             // sendFail, sendSuccess, prepareServer
 
 int serverfd = INVALID_SOCKET;
 
 // Function call on SIGINT
 // Close on Ctrl + C
 void sigintHandler(int signo) {
+
     P("Server exited.");
+
     if (serverfd > 0) {
         close(serverfd);
     }
+
     exit(0);
+
 }
 
 // Function called on terminate
 // Close on error
 void closefd() {
+
     P("Server terminated unexpectedly.");
+
     if (serverfd > 0) {
         close(serverfd);
     }
+
     exit(EXIT_FAILURE);
+
 }
 
 // Get job function from job library and run the job
 bool runJob(const std::string & jobFilePath, ch::context_t & context) {
+
     void * jobLib = dlopen(jobFilePath.c_str(), RTLD_LAZY);
+
     if (jobLib == nullptr) {
         E("Cannot find library file.");
         return false;
     } else {
         const ch::job_f * doJob = (ch::job_f *)dlsym(jobLib, "doJob");
+
         if (doJob == nullptr) {
             E("No doJob function found in the library.");
             I("Please implement doJob function in the library.");
@@ -52,9 +65,12 @@ bool runJob(const std::string & jobFilePath, ch::context_t & context) {
                 return false;
             }
         }
+
         dlclose(jobLib);
+
         return true;
     }
+
 }
 
 // Run as worker
@@ -69,8 +85,10 @@ bool asWorker(const int sockfd) {
         std::string jobName;
         std::string confFilePath;
         std::string workingDir;
+
         if (source.receiveFiles(confFilePath, jobFilePath, jobName, workingDir)) {
             ipconfig_t ips;
+
             if (ch::readIPs(confFilePath, ips)) {
                 // do job
                 const std::string outputFilePath;
@@ -181,8 +199,10 @@ bool asMaster(int sockfd) {
 
 // React based on the call
 void serve(const int sockfd) {
+
     if (sockfd > 0) { // the socket with the RPC caller
         char c;
+
         if (ch::precv(sockfd, static_cast<void *>(&c), sizeof(char))) {
             P("Job accepted.");
             if (c == CALL_MASTER) {
@@ -205,6 +225,7 @@ void serve(const int sockfd) {
             }
         }
     }
+
 }
 
 int main(int argc, char ** argv) {
@@ -217,6 +238,7 @@ int main(int argc, char ** argv) {
 
     if (ch::prepareServer(serverfd, SERVER_PORT)) {
         P("Accepting request.");
+
         while (1) {
             int sockfd = accept(serverfd, reinterpret_cast<struct sockaddr *>(&remote), &s_size);
             std::thread serve_thread{serve, sockfd};
@@ -228,4 +250,5 @@ int main(int argc, char ** argv) {
     }
 
     return 0;
+
 }

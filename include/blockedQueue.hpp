@@ -5,8 +5,8 @@
 #ifndef BLOCKEDQUEUE_H
 #define BLOCKEDQUEUE_H
 
-#include <queue> // std::queue
-#include <mutex> // std::mutex
+#include <queue> // queue
+#include <mutex> // mutex
 
 namespace ch {
 
@@ -16,9 +16,15 @@ namespace ch {
 
     template <typename T>
     class BlockedQueue {
+
         protected:
+
+            // Data structure using STL queue
             std::queue<T> q;
+
+            // Lock for the queue
             std::mutex lock;
+
         public:
 
             // Constructor
@@ -70,43 +76,59 @@ namespace ch {
     // Copy push
     template <typename T>
     void BlockedQueue<T>::push(const T & v) {
+
         std::lock_guard<std::mutex> holder{lock};
+
         q.push(v);
+
     }
 
     // Move push (rvalue)
     template <typename T>
     void BlockedQueue<T>::push(T && v) {
+
         std::lock_guard<std::mutex> holder{lock};
+
         q.push(std::move(v));
+
     }
 
     // Pop
     template <typename T>
     bool BlockedQueue<T>::pop(T & v) {
+
         std::lock_guard<std::mutex> holder{lock};
+
         if (q.empty()) {
             return false;
         }
+
         v = q.front();
         q.pop();
         return true;
+
     }
 
     // True if queue is empty
     template <typename T>
     bool BlockedQueue<T>::empty() const {
+
         std::lock_guard<std::mutex> holder{lock};
+
         return q.empty();
+
     }
 
     // Clear the queue
     template <typename T>
     void BlockedQueue<T>::clear() {
+
         std::lock_guard<std::mutex> holder{lock};
+
         while (!q.empty()) {
             q.pop();
         }
+
     }
 }
 

@@ -1,19 +1,26 @@
-#include <unistd.h> // getopt, getcwd
-#include <string> // string
-#include <iostream> // cout
-#include <fstream> // ifstream, ofstream
-#include <chrono> // system_time
-#include "utils.hpp"
+#include <unistd.h>  // getopt, getcwd, close
+
+#include <string>    // string, getline
+#include <iostream>  // cout
+#include <fstream>   // ifstream, ofstream
+#include <chrono>    // system_clock, duration_cast, milliseconds
+
+#include "utils.hpp" // isValidIP_v4, precv, fileExist, getWorkingDirectory,
+                     // randomString,sconnect, invokeMaster, sendString
 
 // Index IPs in configuration file
-bool createTargetConfigurationFile (const std::string & confFilePath, const std::string & targetConfFilePath) {
+bool createTargetConfigurationFile (const std::string & confFilePath,
+                                    const std::string & targetConfFilePath) {
+
     std::ifstream cis{confFilePath};
     std::ofstream tcis{targetConfFilePath};
+
     if (cis.fail()) {
         E("Cannot open configuration file.");
         I("Check existence of the given configuration file.");
         return false;
     }
+
     if (tcis.fail()) {
         E("Cannot open target configuration file.");
         I("Check if the working directory exists and there are enough space on the disk.");
@@ -22,16 +29,20 @@ bool createTargetConfigurationFile (const std::string & confFilePath, const std:
 
     std::string ip;
     int i = 0;
+
     while (std::getline(cis, ip)) {
         if (ch::isValidIP_v4(ip)) {
             tcis << (i++) << " " << ip << std::endl;
         }
     }
+
     return true;
+
 }
 
 // Parse arguments
 bool parseArgs(const int argc, char * const* argv, std::string & confFilePath, std::string & dataFilePath, std::string & outputFilePath, std::string & jobFilePath) {
+
     char c;
     bool hasC = false;
     bool hasI = false;
@@ -70,12 +81,16 @@ bool parseArgs(const int argc, char * const* argv, std::string & confFilePath, s
             }
         }
     }
+
     return (hasC && hasI && hasO && hasJ);
+
 }
 
 // Get result from master
 void getResult(const int sockfd) {
+
     char c;
+
     if (!ch::precv(sockfd, static_cast<void *>(&c), sizeof(char))) {
         P("No response from the server.");
     } else if (c == RES_SUCCESS) {
@@ -83,6 +98,7 @@ void getResult(const int sockfd) {
     } else {
         P("Job Fail.");
     }
+
 }
 
 int main(int argc, char ** argv) {

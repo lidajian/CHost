@@ -5,12 +5,13 @@
 #ifndef OBJECTSTREAM_H
 #define OBJECTSTREAM_H
 
-#include <unistd.h> // close
+#include <unistd.h>  // close
 
-#include <string> // string
-#include <vector> // vector
+#include <string>    // string
 
-#include "type.hpp" // id_t
+#include "def.hpp"   // INVALID_SOCKET, ID_INVALID
+#include "utils.hpp" // psend, sconnect, sendString
+#include "type.hpp"  // id_t
 
 namespace ch {
 
@@ -22,10 +23,14 @@ namespace ch {
      * Interface of object streams
      */
     class ObjectStream {
+
         protected:
+
             // The socket
             int _sockfd;
+
         public:
+
             // Default constructor
             ObjectStream();
 
@@ -59,9 +64,13 @@ namespace ch {
      */
     template <typename DataType>
     class ObjectOutputStream: public ObjectStream {
+
         protected:
+
             void sendStopSignal(void);
+
         public:
+
             // Default constructor
             ObjectOutputStream();
 
@@ -102,7 +111,9 @@ namespace ch {
      */
     template <typename DataType>
     class ObjectInputStream: public ObjectStream {
+
         public:
+
             // From value
             ObjectInputStream(int sockfd);
 
@@ -141,14 +152,18 @@ namespace ch {
 
     // Move constructor
     ObjectStream::ObjectStream(ObjectStream && o): _sockfd{o._sockfd} {
+
         o._sockfd = INVALID_SOCKET;
+
     }
 
     // Move assignment
     ObjectStream & ObjectStream::operator = (ObjectStream && o) {
+
         _sockfd = o._sockfd;
         o._sockfd = INVALID_SOCKET;
         return *this;
+
     }
 
     // Virtual Destructor
@@ -156,13 +171,17 @@ namespace ch {
 
     // True if the socket is valid
     inline bool ObjectStream::isValid(void) const {
+
         return _sockfd != INVALID_SOCKET;
+
     }
 
     template <typename DataType>
     inline void ObjectOutputStream<DataType>::sendStopSignal(void) {
+
         const id_t id_invalid = ID_INVALID;
         psend(_sockfd, static_cast<const void *>(&id_invalid), sizeof(id_t));
+
     }
 
     // Default constructor
@@ -171,64 +190,83 @@ namespace ch {
 
     // Move constructor
     template <typename DataType>
-    ObjectOutputStream<DataType>::ObjectOutputStream(ObjectOutputStream<DataType> && o): ObjectStream{std::move(o)} {}
+    ObjectOutputStream<DataType>::ObjectOutputStream(ObjectOutputStream<DataType> && o)
+    : ObjectStream{std::move(o)} {}
 
     // Move assignment
     template <typename DataType>
-    ObjectOutputStream<DataType> & ObjectOutputStream<DataType>::operator = (ObjectOutputStream<DataType> && o) {
+    ObjectOutputStream<DataType> &
+        ObjectOutputStream<DataType>::operator = (ObjectOutputStream<DataType> && o) {
+
         _sockfd = o._sockfd;
         o._sockfd = INVALID_SOCKET;
         return *this;
+
     }
 
     // Destructor
     template <typename DataType>
-    ObjectOutputStream<DataType>::~ObjectOutputStream() {close();}
+    ObjectOutputStream<DataType>::~ObjectOutputStream() {
+        close();
+    }
 
     // Connect to an given ip at given port
     template <typename DataType>
     bool ObjectOutputStream<DataType>::open(const std::string & ip, unsigned short port) {
+
         ::close(_sockfd);
         _sockfd = INVALID_SOCKET;
         return sconnect(_sockfd, ip.c_str(), port);
+
     }
 
     // Send signal that causes ObjectInputStream::recv return nullptr
     template <typename DataType>
     void ObjectOutputStream<DataType>::stop() {
+
         if (isValid()) {
             sendStopSignal();
         }
+
     }
 
     // Send signal that causes ObjectInputStream::recv return nullptr
     // close the connection as well
     template <typename DataType>
     void ObjectOutputStream<DataType>::close(void) {
+
         if (isValid()) {
             sendStopSignal();
             ::close(_sockfd);
             _sockfd = INVALID_SOCKET;
         }
+
     }
 
     // Send data through socket
     template <typename DataType>
     bool ObjectOutputStream<DataType>::send(const DataType & v) const {
+
         DSS("ObjectOutputStream: Sending " << v);
+
         id_t id = DataType::getId();
+
         if (psend(_sockfd, static_cast<const void *>(&id), sizeof(id_t))) {
             return v.send(_sockfd);
         } else {
             DSS("ObjectOutputStream: Failed sending " << v);
         }
+
         return false;
+
     }
 
     // Send string through socket
     template <typename DataType>
     bool ObjectOutputStream<DataType>::sendString(const std::string & str) const {
+
         return ch::sendString(_sockfd, str);
+
     }
 
     // From value
@@ -237,48 +275,63 @@ namespace ch {
 
     // Move constructor
     template <typename DataType>
-    ObjectInputStream<DataType>::ObjectInputStream(ObjectInputStream<DataType> && o): ObjectStream{std::move(o)} {}
+    ObjectInputStream<DataType>::ObjectInputStream(ObjectInputStream<DataType> && o)
+    : ObjectStream{std::move(o)} {}
 
     // Move assignment
     template <typename DataType>
-    ObjectInputStream<DataType> & ObjectInputStream<DataType>::operator = (ObjectInputStream<DataType> && o) {
+    ObjectInputStream<DataType> &
+        ObjectInputStream<DataType>::operator = (ObjectInputStream<DataType> && o) {
+
         _sockfd = o._sockfd;
         o._sockfd = INVALID_SOCKET;
         return *this;
+
     }
 
     // Destructor
     template <typename DataType>
     ObjectInputStream<DataType>::~ObjectInputStream() {
+
         close();
+
     }
 
     // Close the connection
     template <typename DataType>
     void ObjectInputStream<DataType>::close(void) {
+
         if (isValid()) {
             ::close(_sockfd);
             _sockfd = INVALID_SOCKET;
         }
+
     }
 
     // Receive data, return pointer to data if success
     // return nullptr if failed
     template <typename DataType>
     DataType * ObjectInputStream<DataType>::recv(void) const {
+
         id_t id = ID_INVALID;
+
         if (precv(_sockfd, static_cast<void *>(&id), sizeof(id_t))) {
             if (id == DataType::getId()) {
                 DataType * v = new DataType{};
+
                 if (!(v->recv(_sockfd))) {
                     delete v;
                     return nullptr;
                 }
+
                 DSS("ObjectInputStream: Received " << (*v));
+
                 return v;
             }
         }
+
         return nullptr;
+
     }
 }
 

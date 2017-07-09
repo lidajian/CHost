@@ -12,7 +12,9 @@
 namespace ch {
 
     class Partitioner {
+
         public:
+
             // Get the partition
             virtual size_t getPartition(int i, int s) const = 0;
     };
@@ -21,7 +23,9 @@ namespace ch {
      * HashPartitioner: Remainder method
      */
     class HashPartitioner: public Partitioner {
+
         public:
+
             size_t getPartition(int i, int s) const {
                 if (i == INT_MIN) {
                     return 0;
@@ -34,7 +38,9 @@ namespace ch {
      * ZeroPartitioner: Map to master anyway
      */
     class ZeroPartitioner: public Partitioner {
+
         public:
+
             size_t getPartition(int i, int s) const {
                 return 0;
             }

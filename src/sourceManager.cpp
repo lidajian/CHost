@@ -3,48 +3,67 @@
 namespace ch {
 
     // Rearrange ipconfig to create configure files for other machines
-    void SourceManagerMaster::rearrangeIPs(const ipconfig_t & ips, std::string & file, const size_t indexToHead) {
+    void SourceManagerMaster::rearrangeIPs(const ipconfig_t & ips, std::string & file,
+                                           const size_t indexToHead) {
+
         file = std::to_string(ips[indexToHead].first) + " " + ips[indexToHead].second + "\n";
+
         for (size_t i = 0, l = ips.size(); i < l; ++i) {
             if (i != indexToHead) {
                 file += std::to_string(ips[i].first) + " " + ips[i].second + "\n";
             }
         }
+
     }
 
     // Constructor
-    SourceManagerMaster::SourceManagerMaster(const std::string & dataFile, const std::string & jobFilePath): _jobFilePath{jobFilePath} {
-        if (ch::readFileAsString(jobFilePath.c_str(), _jobFileContent)) {
+    SourceManagerMaster::SourceManagerMaster(const std::string & dataFile,
+                                             const std::string & jobFilePath)
+    : _jobFilePath{jobFilePath} {
+
+        if (readFileAsString(jobFilePath.c_str(), _jobFileContent)) {
             if (splitter.open(dataFile.c_str())) {
-                D("(SourceManagerMaster) Fail to open data file.");
+                E("(SourceManagerMaster) Fail to open data file.");
             }
         } else {
-            D("(SourceManagerMaster) Fail to read job file.");
+            E("(SourceManagerMaster) Fail to read job file.");
         }
+
     }
 
     // Destructor
     SourceManagerMaster::~SourceManagerMaster() {
+
         for (size_t i = 1, l = connections.size(); i < l; ++i) {
             if (connections[i] >= 0) {
                 close(connections[i]);
             }
         }
+
     }
 
     // Connect to workers and deliver files
-    bool SourceManagerMaster::connectAndDeliver(const ipconfig_t & ips, const std::string & jobName, unsigned short port) {
+    bool SourceManagerMaster::connectAndDeliver(const ipconfig_t & ips,
+                                                const std::string & jobName,
+                                                unsigned short port) {
+
         size_t l = ips.size();
+
         if (l == 0) {
             return false;
         }
+
         connections.resize(l, INVALID_SOCKET);
         size_t nConnections = l - 1;
+
         if (nConnections > 0) {
             ThreadPool threadPool{MIN_VAL(THREAD_POOL_SIZE, nConnections)};
+
             for (size_t i = 1; i < l; ++i) {
                 int & sockfd = connections[i];
-                threadPool.addTask([i, &ips, port, &sockfd, &jobName, this](){ // Start connection threads
+
+                // Start connection threads
+                threadPool.addTask([i, &ips, port, &sockfd, &jobName, this](){
 
                     const std::string & ip = ips[i].second;
 
@@ -88,7 +107,9 @@ namespace ch {
 
                 });
             }
-            threadPool.stop(); // wait until all connection thread ends
+
+            // wait until all connection thread ends
+            threadPool.stop();
             for (size_t i = 1; i < l; ++i) {
                 if (connections[i] < 0) {
                     // Clean up all connections
@@ -102,11 +123,14 @@ namespace ch {
                 }
             }
         }
+
         return true;
+
     }
 
     // Start distribution thread
     void SourceManagerMaster::startDistributionThread() {
+
         size_t l = connections.size();
         workerIsSuccess.resize(l, false);
 
@@ -122,6 +146,7 @@ namespace ch {
                 char receivedChar;
                 std::string split;
                 ssize_t endSize = INVALID;
+
                 while (precv(sockfd, static_cast<void *>(&receivedChar), sizeof(char))) {
                     if (receivedChar == CALL_POLL) {
                         if (!(this->splitter.next(split))) { // end service by server
@@ -150,12 +175,14 @@ namespace ch {
 
                 for (size_t i = 1; i < l; ++i) {
                     int & sockfd = this->connections[i];
+
                     dthreads.emplace_back([i, &sockfd, this](){
 
                         // provide poll service
                         char receivedChar;
                         std::string split;
                         ssize_t endSize = INVALID;
+
                         while (precv(sockfd, static_cast<void *>(&receivedChar), sizeof(char))) {
                             if (receivedChar == CALL_POLL) {
                                 if (!(this->splitter.next(split))) { // end service by server
@@ -224,6 +251,7 @@ namespace ch {
                 // Handle events
                 while (endedConnection < nConnections) {
                     nEvents = Kevent(kq, nullptr, 0, events, nConnections, nullptr);
+
                     if (nEvents < 0) {
                         break;
                     } else {
@@ -244,6 +272,7 @@ namespace ch {
                     const int & conn = connections[i];
                     events[0].events = EPOLLIN;
                     events[0].data.fd = conn;
+
                     if (epoll_ctl(ep, EPOLL_CTL_ADD, conn, events) < 0) {
                         close(ep);
                         return;
@@ -256,6 +285,7 @@ namespace ch {
                 // Handle events
                 while (endedConnection < nConnections) {
                     nEvents = Epoll_wait(ep, events, nConnections, -1);
+
                     if (nEvents < 0) {
                         break;
                     } else {
@@ -266,6 +296,7 @@ namespace ch {
                 fd_set fdset_o, fdset;
                 int fdmax = 0;
                 FD_ZERO(&fdset_o);
+
                 for (size_t i = 1; i < l; ++i) {
                     const int & conn = connections[i];
                     fdmax = MAX_VAL(fdmax, conn);
@@ -279,6 +310,7 @@ namespace ch {
                 while (endedConnection < nConnections) {
                     FD_COPY(&fdset_o, &fdset);
                     nEvents = Select(fdmax + 1, &fdset, nullptr, nullptr, nullptr);
+
                     if (nEvents < 0) {
                         break;
                     } else {
@@ -309,12 +341,14 @@ namespace ch {
                             } else {
                                 // provide poll service
                                 char receivedChar;
+
                                 if (!precv(sockfd, static_cast<void *>(&receivedChar), sizeof(char))) {
                                     ++endedConnection;
                                     close(sockfd);
                                 } else {
                                     if (receivedChar == CALL_POLL) {
                                         std::string & split = splitCaches[sockfd];
+
                                         threadPool.addTask([this, sockfd, &repliedEOF, &endedConnection, &split](){
                                             if (!(this->splitter.next(split))) { // end service by server
                                                 ssize_t endSize = INVALID;
@@ -347,45 +381,59 @@ namespace ch {
 
             }
         }};
+
     }
 
     // Block the current thread until all distribution threads terminate
     void SourceManagerMaster::blockTillDistributionThreadsEnd() {
+
         if (dthread != nullptr) {
             dthread->join();
             delete dthread;
             dthread = nullptr;
         }
+
     }
 
     // True if all worker success
     bool SourceManagerMaster::allWorkerSuccess() {
+
         size_t numIPs = workerIsSuccess.size();
+
         if (numIPs == 0) {
             D("(SourceManagerMaster) Cannot get worker results when no threads started.");
             return false;
         }
+
         for (size_t i = 1; i < numIPs; ++i) {
             if (!workerIsSuccess[i]) {
                 DSS("(SourceManagerMaster) The " << i << "th worker failed.");
                 return false;
             }
         }
+
         return true;
+
     }
 
     inline bool SourceManagerMaster::isValid() const {
+
         return splitter.isValid();
+
     }
 
     bool SourceManagerMaster::poll(std::string & ret) {
+
         return splitter.next(ret);
+
     }
 
     // Send poll request
     bool SourceManagerWorker::pollRequest() const {
+
         const char c = CALL_POLL;
         return psend(fd, static_cast<const void *>(&c), sizeof(char));
+
     }
 
     // Constructor for worker
@@ -396,58 +444,80 @@ namespace ch {
 
     // Move Constructor
     SourceManagerWorker::SourceManagerWorker(SourceManagerWorker && o): fd{o.fd} {
+
         o.fd = INVALID_SOCKET;
+
     }
 
     // Copy assignment
     SourceManagerWorker & SourceManagerWorker::operator = (const SourceManagerWorker & o) {
+
         fd = o.fd;
+
         return *this;
+
     }
 
     // Move assignment
     SourceManagerWorker & SourceManagerWorker::operator = (SourceManagerWorker && o) {
+
         fd = o.fd;
         o.fd = INVALID_SOCKET;
         return *this;
+
     }
 
     // Receive resource files
     // 1. Configuration file
     // 2. Job file
-    bool SourceManagerWorker::receiveFiles(std::string & confFilePath, std::string & jobFilePath, std::string & jobName, std::string & workingDir) {
+    bool SourceManagerWorker::receiveFiles(std::string & confFilePath,
+                                           std::string & jobFilePath,
+                                           std::string & jobName,
+                                           std::string & workingDir) {
+
         if (!isValid()) {
             D("(SourceManagerWorker) The socket failed.");
             return false;
         }
+
         if (!receiveString(fd, jobName)) {
             E("Fail to receive job name.");
             return false;
         }
+
         if (!getWorkingDirectory(workingDir, jobName)) {
             return false;
         }
+
         confFilePath = workingDir + IPCONFIG_FILE;
         jobFilePath = workingDir + JOB_FILE;
+
         if (!receiveFile(fd, confFilePath.c_str())) {
             E("Fail to receive configuration file.");
             return false;
         }
+
         if (!receiveFile(fd, jobFilePath.c_str())) {
             E("Fail to receive job file.");
             return false;
         }
+
         return true;
+
     }
 
     inline bool SourceManagerWorker::isValid() const {
+
         return (fd > 0);
+
     }
 
     bool SourceManagerWorker::poll(std::string & ret) {
+
 #ifdef MULTIPLE_MAPPER
         std::lock_guard<std::mutex> holder{lock};
 #endif
+
         if (!isValid()) {
             D("(SourceManagerWorker) The socket failed.");
             return false;
@@ -465,5 +535,6 @@ namespace ch {
                 return true;
             }
         }
+
     }
 }

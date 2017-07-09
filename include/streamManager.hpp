@@ -5,21 +5,27 @@
 #ifndef STREAMMANAGER_H
 #define STREAMMANAGER_H
 
-#include <netinet/in.h> // sockaddr_in
-#include <unistd.h> // close
-#include <sys/socket.h> // accept
+#include <netinet/in.h>     // sockaddr_in
+#include <arpa/inet.h>      // inet_ntoa
+#include <unistd.h>         // close
+#include <sys/socket.h>     // accept, socklen_t, getpeername
 
-#include <vector> // vector
-#include <string> // string
-#include <fstream> // ofstream
-#include <thread> // thread
-#include <chrono> // seconds
-#include <memory> // unique_ptr, std::addressof
+#include <atomic>           // atomic_xxx
+#include <vector>           // vector
+#include <string>           // string
+#include <fstream>          // ofstream
+#include <thread>           // thread, yield, sleep_for
+#include <chrono>           // seconds
+#include <memory>           // unique_ptr, std::addressof
+#include <unordered_map>    // unordered_map
 
+#include "def.hpp"          // ipconfig_t, STREAMMANAGER_PORT, MAX_CONNECTION_ATTEMPT,
+                            // select/epoll/kqueue headers
+#include "utils.hpp"        // receiveString, prepareServer, readIPs
 #include "objectStream.hpp" // ObjectInputStream, ObjectOutputStream
-#include "dataManager.hpp" // DataManager
-#include "partitioner.hpp" // Partitioner
-#include "threadPool.hpp" // ThreadPool
+#include "dataManager.hpp"  // DataManager
+#include "partitioner.hpp"  // Partitioner
+#include "threadPool.hpp"   // ThreadPool
 
 namespace ch {
 
@@ -29,7 +35,9 @@ namespace ch {
 
     template <typename DataType>
     class StreamManager {
+
         protected:
+
             // Id of the machine
             size_t selfId;
 
@@ -58,11 +66,15 @@ namespace ch {
             const Partitioner * _partitioner;
 
             // Server thread: accept connections
-            static void serverThread(int serverfd, const ipconfig_t & ips, std::vector<ObjectInputStream<DataType> *> & istreams, std::vector<int> & connections, const std::string & jobName);
+            static void serverThread(int serverfd, const ipconfig_t & ips,
+                                     std::vector<ObjectInputStream<DataType> *> & istreams,
+                                     std::vector<int> & connections, const std::string & jobName);
 
             // Connect thread: connect to servers
             // sets stmr to the created object output stream if success
-            static void connectThread(const std::string & ip, ObjectOutputStream<DataType> * & stmr, const std::string & jobName);
+            static void connectThread(const std::string & ip,
+                                      ObjectOutputStream<DataType> * & stmr,
+                                      const std::string & jobName);
 
             // Close and clear all streams
             void clearStreams();
@@ -70,12 +82,18 @@ namespace ch {
             // Initialize streams
             // Accept and connect to all machines
             void establishConnection(const ipconfig_t & ips, const std::string & jobName);
+
         public:
+
             // Constructor: given directory of configuration
-            StreamManager(const std::string & configureFile, const std::string & dir, const std::string & jobName, size_t maxDataSize = DEFAULT_MAX_DATA_SIZE, bool presort = true, const Partitioner & partitioner = hashPartitioner);
+            StreamManager(const std::string & configureFile, const std::string & dir,
+                          const std::string & jobName, size_t maxDataSize = DEFAULT_MAX_DATA_SIZE,
+                          bool presort = true, const Partitioner & partitioner = hashPartitioner);
 
             // Constructor: given vector of IP configuration
-            StreamManager(const ipconfig_t & ips, const std::string & dir, const std::string & jobName, size_t maxDataSize = DEFAULT_MAX_DATA_SIZE, bool presort = true, const Partitioner & partitioner = hashPartitioner);
+            StreamManager(const ipconfig_t & ips, const std::string & dir,
+                          const std::string & jobName, size_t maxDataSize = DEFAULT_MAX_DATA_SIZE,
+                          bool presort = true, const Partitioner & partitioner = hashPartitioner);
 
             // Copy constructor (deleted)
             StreamManager(const StreamManager<DataType> &) = delete;
@@ -103,7 +121,8 @@ namespace ch {
             // Start receive on all sockets
             void startReceive(void);
 
-            // Send stop signal to other machines, cause receive thread on other machines to terminate and close connection
+            // Send stop signal to other machines, cause receive thread on other machines
+            // to terminate and close connection
             // called when we don't need these connections anymore
             void finalizeSend(void);
 
@@ -111,7 +130,8 @@ namespace ch {
             // called when we need to temporarily stop receiving (e.g. switch from map to reduce)
             void stopSend(void);
 
-            // Cause the current thread to block until all receive thread end and clear resource of receive threads
+            // Cause the current thread to block until all receive thread end
+            // and clear resource of receive threads
             void blockTillRecvEnd(void);
 
             // Push data to the specific machine (partitioned by partitioner)
@@ -136,7 +156,9 @@ namespace ch {
 
     // Server thread: accept connections
     template <typename DataType>
-    void StreamManager<DataType>::serverThread(int serverfd, const ipconfig_t & ips, std::vector<ObjectInputStream<DataType> *> & istreams, std::vector<int> & connections, const std::string & jobName) {
+    void StreamManager<DataType>::serverThread(int serverfd, const ipconfig_t & ips,
+                        std::vector<ObjectInputStream<DataType> *> & istreams,
+                        std::vector<int> & connections, const std::string & jobName) {
 
         std::string remoteJobName;
 
@@ -233,10 +255,12 @@ namespace ch {
                     (getpeername(sockfd, reinterpret_cast<struct sockaddr *>(&remote), &s_size) >= 0) &&
                     receiveString(sockfd, remoteJobName) &&
                     (remoteJobName.compare(jobName) == 0)) {
-                    PSS("(StreamManager) Server accepted connection from " << inet_ntoa(remote.sin_addr));
+
+                    PSS("(StreamManager) Server accepted connection from " <<
+                        inet_ntoa(remote.sin_addr));
+
                     connections.push_back(sockfd);
-                    ObjectInputStream<DataType> * stm = new ObjectInputStream<DataType>(sockfd);
-                    istreams.push_back(stm);
+                    istreams.push_back(new ObjectInputStream<DataType>{sockfd});
                 } else {
                     --i;
                     if (sockfd > 0) {
@@ -252,20 +276,25 @@ namespace ch {
 #endif
 
         close(serverfd);
+
     }
 
     // Connect thread: connect to servers
     // sets stmr to the created object output stream if success
     template <typename DataType>
-    void StreamManager<DataType>::connectThread(const std::string & ip, ObjectOutputStream<DataType> * & stmr, const std::string & jobName) {
+    void StreamManager<DataType>::connectThread(const std::string & ip,
+            ObjectOutputStream<DataType> * & stmr, const std::string & jobName) {
+
         ObjectOutputStream<DataType> * stm = new ObjectOutputStream<DataType>{};
         int tries = 0;
+
         while (tries < MAX_CONNECTION_ATTEMPT && !(stm->open(ip, STREAMMANAGER_PORT))) {
             ++tries;
             // wait at least CONNECTION_RETRY_INTERVAL second before another try
             std::this_thread::yield();
             std::this_thread::sleep_for(std::chrono::seconds(CONNECTION_RETRY_INTERVAL));
         }
+
         if (tries == MAX_CONNECTION_ATTEMPT) {
             ESS("(StreamManager) Client fail to connect to " << ip);
             delete stm;
@@ -276,11 +305,13 @@ namespace ch {
             PSS("(StreamManager) Client connected to " << ip);
             stmr = stm;
         }
+
     }
 
     // Close and clear all streams
     template <typename DataType>
     void StreamManager<DataType>::clearStreams() {
+
         for (ObjectOutputStream<DataType> * stm: ostreams) {
             if (stm != nullptr) {
                 stm->close();
@@ -288,19 +319,22 @@ namespace ch {
             }
         }
         ostreams.clear();
+
         for (ObjectInputStream<DataType> * stm: istreams) {
-            if (stm != nullptr) {
-                stm->close();
-                delete stm;
-            }
+            stm->close();
+            delete stm;
         }
         istreams.clear();
+
+        connections.clear();
+
     }
 
     // Initialize streams
     // Accept and connect to all machines
     template <typename DataType>
-    void StreamManager<DataType>::establishConnection(const ipconfig_t & ips, const std::string & jobName){
+    void StreamManager<DataType>::establishConnection(const ipconfig_t & ips,
+                                                      const std::string & jobName){
 
         selfId = ips[0].first;
 
@@ -310,6 +344,7 @@ namespace ch {
         }
 
         int serverfd;
+
         if (!prepareServer(serverfd, STREAMMANAGER_PORT)) {
             E("(StreamManager) Fail to open socket to accept clients.");
             return;
@@ -324,11 +359,13 @@ namespace ch {
         ThreadPool threadPool{MIN_VAL(THREAD_POOL_SIZE, clusterSize - 1)};
 
         // create server thread to accept connection
-        std::thread sthread{serverThread, serverfd, std::ref(ips), std::ref(istreams), std::ref(connections), std::ref(jobName)};
+        std::thread sthread{serverThread, serverfd, std::ref(ips), std::ref(istreams),
+                            std::ref(connections), std::ref(jobName)};
 
         // create connect thread to connect to server
         for (size_t i = 1; i < clusterSize; ++i) {
-            threadPool.addTask(connectThread, std::ref(ips[i].second), std::ref(ostreams[ips[i].first]), std::ref(jobName));
+            threadPool.addTask(connectThread, std::ref(ips[i].second),
+                               std::ref(ostreams[ips[i].first]), std::ref(jobName));
         }
 
         sthread.join();
@@ -352,34 +389,54 @@ namespace ch {
         }
 
         connected = true;
+
         P("(StreamManager) Connection set up successfully.");
+
     }
 
     // Constructor: given directory of configuration
     template <typename DataType>
-    StreamManager<DataType>::StreamManager(const std::string & configureFile, const std::string & dir, const std::string & jobName, size_t maxDataSize, bool presort, const Partitioner & partitioner):
-        connected{false}, receiveThread{nullptr}, _data{dir, maxDataSize, presort}, _partitioner{&partitioner} {
+    StreamManager<DataType>::StreamManager(const std::string & configureFile,
+                                           const std::string & dir,
+                                           const std::string & jobName,
+                                           size_t maxDataSize, bool presort,
+                                           const Partitioner & partitioner)
+    : connected{false}, receiveThread{nullptr}, _data{dir, maxDataSize, presort},
+      _partitioner{&partitioner} {
+
         ipconfig_t ips;
+
         if (!readIPs(configureFile, ips)) {
             return;
         }
+
         clusterSize = ips.size();
+
         if (clusterSize > 0) {
             establishConnection(ips, jobName);
         } else {
             E("(StreamManager) Empty configuration.");
         }
+
     }
 
     // Constructor: given vector of IP configuration
     template <typename DataType>
-    StreamManager<DataType>::StreamManager(const ipconfig_t & ips, const std::string & dir, const std::string & jobName, size_t maxDataSize, bool presort, const Partitioner & partitioner):
-        clusterSize{ips.size()}, connected{false}, receiveThread{nullptr}, _data{dir, maxDataSize, presort}, _partitioner{&partitioner} {
+    StreamManager<DataType>::StreamManager(const ipconfig_t & ips,
+                                           const std::string & dir,
+                                           const std::string & jobName,
+                                           size_t maxDataSize,
+                                           bool presort,
+                                           const Partitioner & partitioner)
+    : clusterSize{ips.size()}, connected{false}, receiveThread{nullptr},
+      _data{dir, maxDataSize, presort}, _partitioner{&partitioner} {
+
         if (clusterSize > 0) {
             establishConnection(ips, jobName);
         } else {
             E("(StreamManager) Empty configuration.");
         }
+
     }
 
     // Destructor
@@ -395,34 +452,44 @@ namespace ch {
         }
 
         clearStreams();
+
     }
 
 
     // True if receive threads exists
     template <typename DataType>
     inline bool StreamManager<DataType>::isReceiving(void) const {
+
         return (receiveThread != nullptr);
+
     }
 
     // True if connected
     template <typename DataType>
     inline bool StreamManager<DataType>::isConnected(void) const {
+
         return connected;
+
     }
 
     // Start receive on all sockets
     template <typename DataType>
     void StreamManager<DataType>::startReceive(void) {
+
         if (isReceiving()) {
             D("(StreamManager) Already receiving.");
         } else if (isConnected()) {
             receiveThread = new std::thread([this](){
+
                 size_t nWorker = this->connections.size();
+
                 if (nWorker == 0) {
                     return;
                 } else if (nWorker == 1) {
                     const ObjectInputStream<DataType> * stm = this->istreams[0];
+
                     DataType * got = nullptr;
+
                     while ((got = stm->recv())) {
                         if (!(this->_data.store(got))) {
                             break;
@@ -430,8 +497,10 @@ namespace ch {
                     }
                 } else if (nWorker <= THREAD_POOL_SIZE) {
                     std::vector<std::thread> threads;
+
                     for (size_t i = 0; i < nWorker; ++i) {
                         const ObjectInputStream<DataType> * stm = this->istreams[i++];
+
                         threads.emplace_back([this, &stm](){
                             DataType * got = nullptr;
                             while ((got = stm->recv())) {
@@ -441,6 +510,7 @@ namespace ch {
                             }
                         });
                     }
+
                     for (std::thread & thrd: threads) {
                         thrd.join();
                     }
@@ -465,6 +535,7 @@ namespace ch {
                     }
 
                     struct kevent event, events[nWorker];
+
                     for (size_t i = 0; i < nWorker; ++i) {
                         const int & conn = this->connections[i];
                         EV_SET(events + i - 1, conn, EVFILT_READ, EV_ADD, 0, 0, nullptr);
@@ -482,12 +553,14 @@ namespace ch {
                     // Handle events
                     while (endedReceive < nWorker) {
                         nEvents = Kevent(kq, nullptr, 0, events, nWorker, &timeout);
+
                         if (nEvents < 0) {
                             break;
                         } else {
                             for (int i = 0; i < nEvents; ++i) {
                                 int sockfd = events[i].ident;
                                 EV_SET(&event, sockfd, EVFILT_READ, EV_DISABLE, 0, 0, nullptr);
+
                                 if (Kevent(kq, &event, 1, nullptr, 0, nullptr) < 0) {
                                     close(kq);
                                     return;
@@ -508,6 +581,7 @@ namespace ch {
                         const int & conn = this->connections[i];
                         event.events = EPOLLIN;
                         event.data.fd = conn;
+
                         if (epoll_ctl(ep, EPOLL_CTL_ADD, conn, &event) < 0) {
                             close(ep);
                             return;
@@ -518,11 +592,13 @@ namespace ch {
                     // Handle events
                     while (endedReceive < nWorker) {
                         nEvents = Epoll_wait(ep, events, nWorker, RECEIVE_TIMEOUT * 1000);
+
                         if (nEvents < 0) {
                             break;
                         } else {
                             for (int i = 0; i < nEvents; ++i) {
                                 int sockfd = events[i].data.fd;
+
                                 if (epoll_ctl(ep, EPOLL_CTL_DEL, sockfd, nullptr) < 0) {
                                     close(ep);
                                     return;
@@ -533,6 +609,7 @@ namespace ch {
                     fd_set fdset_o, fdset;
                     int fdmax = 0;
                     FD_ZERO(&fdset_o);
+
                     for (size_t i = 0; i < nWorker; ++i) {
                         const int & conn = this->connections[i];
                         fdmax = MAX_VAL(fdmax, conn);
@@ -548,11 +625,13 @@ namespace ch {
                     while (endedReceive < nWorker) {
                         FD_COPY(&fdset_o, &fdset);
                         nEvents = Select(fdmax + 1, &fdset, nullptr, nullptr, &timeout);
+
                         if (nEvents < 0) {
                             break;
                         } else {
                             for (size_t i = 0; i < nWorker; ++i) {
                                 int sockfd = this->connections[i];
+
                                 if (!FD_ISSET(sockfd, &fdset_o)) {
                                     continue;
                                 }
@@ -561,6 +640,7 @@ namespace ch {
 #endif
                                     const ObjectInputStream<DataType> * stm = this->istreams[fdToIndex[sockfd]];
                                     DataType * got = nullptr;
+
                                     if ((got = stm->recv())) {
                                         if (!this->_data.store(got)) {
                                             ++endedReceive;
@@ -598,71 +678,87 @@ namespace ch {
         }
     }
 
-    // Send stop signal to other machines, cause receive thread on other machines to terminate and close connection
+    // Send stop signal to other machines, cause receive thread on other machines
+    // to terminate and close connection
     // called when we don't need these connections anymore
     template <typename DataType>
     void StreamManager<DataType>::finalizeSend(void) {
+
         for (ObjectOutputStream<DataType> * stm: ostreams) {
             if (stm != nullptr) {
                 stm->close();
                 delete stm;
             }
         }
+
         ostreams.clear();
+
     }
 
     // Send stop signal to other machines, cause receive thread on other machines to terminate
     // called when we need to temporarily stop receiving (e.g. switch from map to reduce)
     template <typename DataType>
     void StreamManager<DataType>::stopSend(void) {
+
         for (ObjectOutputStream<DataType> * stm: ostreams) {
             if (stm != nullptr) {
                 stm->stop();
             }
         }
+
     }
 
-    // Cause the current thread to block until all receive thread end and clear resource of receive threads
+    // Cause the current thread to block until all receive thread end and clear resource
+    // of receive threads
     template <typename DataType>
     void StreamManager<DataType>::blockTillRecvEnd(void) {
+
         if (isReceiving()) {
             receiveThread->join();
             delete receiveThread;
             receiveThread = nullptr;
             D("(StreamManager) Receive threads ended.");
         }
+
     }
 
     // Push data to the specific machine (partitioned by partitioner)
     template <typename DataType>
     bool StreamManager<DataType>::push(DataType & v) {
+
         size_t id = _partitioner->getPartition(v.hashCode(), clusterSize);
+
         if (id == selfId) {
             return _data.store(v);
         } else {
             return ostreams[id]->send(v);
         }
+
     }
 
     // Get sorted stream from data manager
     template <typename DataType>
     SortedStream<DataType> * StreamManager<DataType>::getSortedStream () {
+
         return _data.getSortedStream();
+
     }
 
     // Pour data to text file with temporary files in data manager
     template <typename DataType>
     bool StreamManager<DataType>::pourToTextFile (const char * path) {
         std::ofstream os(path);
+
         if (os) {
             UnsortedStream<DataType> * unsorted = _data.getUnsortedStream();
-            if (unsorted) {
 
+            if (unsorted) {
                 std::unique_ptr<UnsortedStream<DataType> > _unsorted{unsorted};
 
                 DataType temp;
                 while (unsorted->get(temp)) {
                     os << temp.toString() << std::endl;
+
                     if (!os) {
                         E("(StreamManager) Fail to write to text file.");
                         I("Check if there is no space.");
@@ -678,18 +774,23 @@ namespace ch {
             I("Check if there is no space.");
             return false;
         }
+
     }
 
     // Set presort of data manager
     template <typename DataType>
     void StreamManager<DataType>::setPresort(bool presort) {
+
         _data.setPresort(presort);
+
     }
 
     // Set partitioner
     template <typename DataType>
     void StreamManager<DataType>::setPartitioner(const Partitioner & partitioner) {
+
         _partitioner = std::addressof(partitioner);
+
     }
 }
 
