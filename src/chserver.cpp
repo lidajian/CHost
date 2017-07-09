@@ -8,7 +8,7 @@
 #include <string>            // string
 #include <thread>            // thread
 
-#include "def.hpp"           // SERVER_PORT
+#include "def.hpp"           // SERVER_PORT, CALL_xxx
 #include "sourceManager.hpp" // SourceManagerWorker, SourceManagerMaster
 #include "job.hpp"           // job_f, context_t
 #include "utils.hpp"         // readIPs, receiveString, getWorkingDirectory,
@@ -211,7 +211,6 @@ void serve(const int sockfd) {
                 } else {
                     ch::sendSuccess(sockfd);
                 }
-                close(sockfd);
             } else if (c == CALL_WORKER) {
                 // Result to be processed by sourceManager
                 if (!asWorker(sockfd)) {
@@ -219,11 +218,14 @@ void serve(const int sockfd) {
                 } else {
                     ch::sendSuccess(sockfd);
                 }
-                close(sockfd);
+            } else if (c == CALL_CANCEL) {
+                P("Job canceled by master.");
             } else {
-                E("Unsupported call.");
+                P("Unsupported call.");
             }
         }
+
+        close(sockfd);
     }
 
 }

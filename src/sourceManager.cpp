@@ -57,26 +57,44 @@ namespace ch {
         size_t nConnections = l - 1;
 
         if (nConnections > 0) {
+
+            // Connect to all workers
+            for (size_t i = 1; i < l; ++i) {
+                int & sockfd = connections[i];
+
+                const std::string & ip = ips[i].second;
+
+                // create socket to clients
+                if (!sconnect(sockfd, ip.c_str(), port)) {
+                    ESS("(SourceManagerMaster) Cannot connect to client on" << ip);
+                    sockfd = INVALID_SOCKET;
+                    break;
+                }
+            }
+
+            // Check if all connections set up
+            for (size_t i = 1; i < l; ++i) {
+                if (connections[i] < 0) {
+                    // Clean up all connections
+                    for (size_t j = 1; j < i; ++j) {
+                        cancelWorker(connections[j]);
+                        close(connections[j]);
+                    }
+                    connections.clear();
+                    return false;
+                }
+            }
+
             ThreadPool threadPool{MIN_VAL(THREAD_POOL_SIZE, nConnections)};
 
             for (size_t i = 1; i < l; ++i) {
                 int & sockfd = connections[i];
 
                 // Start connection threads
-                threadPool.addTask([i, &ips, port, &sockfd, &jobName, this](){
-
-                    const std::string & ip = ips[i].second;
-
-                    // create socket to clients
-                    if (!sconnect(sockfd, ip.c_str(), port)) {
-                        ESS("(SourceManagerMaster) Cannot connect to client on" << ip);
-                        sockfd = INVALID_SOCKET;
-                        return;
-                    }
+                threadPool.addTask([i, &ips, &sockfd, &jobName, this](){
 
                     // create client on clients
                     if(!invokeWorker(sockfd)) {
-                        ESS("(SourceManagerMaster) Cannot invoke worker on " << ip);
                         close(sockfd);
                         sockfd = INVALID_SOCKET;
                         return;
@@ -110,11 +128,13 @@ namespace ch {
 
             // wait until all connection thread ends
             threadPool.stop();
+
+            // Check if all connections are health
             for (size_t i = 1; i < l; ++i) {
                 if (connections[i] < 0) {
                     // Clean up all connections
                     for (i = 1; i < l; ++i) {
-                        if (connections[i] >= 0) {
+                        if (connections[i] > 0) {
                             close(connections[i]);
                         }
                     }

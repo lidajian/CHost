@@ -57,6 +57,7 @@ P(tss.str().c_str())
 // RPC symbols
 #define CALL_MASTER 'M'
 #define CALL_WORKER 'W'
+#define CALL_CANCEL 'C'
 #define CALL_POLL 'P'
 
 // Success/Fail symbols

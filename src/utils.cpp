@@ -633,6 +633,15 @@ namespace ch {
 
     }
 
+    // Cancel worker
+    bool cancelWorker(int fd) {
+
+        const char c = CALL_CANCEL;
+        return psend(fd, static_cast<const void *>(&c), sizeof(char));
+
+    }
+
+
     // Return success to chrun program
     void sendSuccess(const int sockfd) {
 

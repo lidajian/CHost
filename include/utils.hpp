@@ -120,6 +120,9 @@ namespace ch {
     // Invoke worker
     bool invokeWorker(int fd);
 
+    // Cancel worker
+    bool cancelWorker(int fd);
+
     // Return success to chrun program
     void sendSuccess(const int sockfd);
 
