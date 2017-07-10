@@ -1,4 +1,5 @@
 #include <unistd.h>  // getopt, getcwd, close
+#include <time.h>    // time
 
 #include <string>    // string, getline
 #include <iostream>  // cout
@@ -140,7 +141,9 @@ int main(int argc, char ** argv) {
     }
 
     // Create configuration file
-    const std::string & jobName = ch::randomString(RANDOM_JOB_NAME_LENGTH);
+    std::string jobName{"job_"};
+    jobName += std::to_string(time(nullptr));
+    jobName += ch::randomString(RANDOM_JOB_NAME_LENGTH);
     std::string workingDir;
 
     if (!ch::getWorkingDirectory(workingDir, jobName)) {
