@@ -93,6 +93,10 @@ namespace ch {
 
         std::lock_guard<std::mutex> holder{_dataLock};
 
+        for (const DataType * & v: _data) {
+            delete v;
+        }
+
         _data.clear();
 
     }

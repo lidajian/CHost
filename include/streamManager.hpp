@@ -447,9 +447,7 @@ namespace ch {
 
         finalizeSend();
 
-        if (isReceiving()) {
-            blockTillRecvEnd();
-        }
+        blockTillRecvEnd();
 
         clearStreams();
 
@@ -714,8 +712,8 @@ namespace ch {
     void StreamManager<DataType>::blockTillRecvEnd(void) {
 
         if (isReceiving()) {
+            std::unique_ptr<std::thread> holder{receiveThread};
             receiveThread->join();
-            delete receiveThread;
             receiveThread = nullptr;
             D("(StreamManager) Receive threads ended.");
         }
