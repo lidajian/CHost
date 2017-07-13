@@ -14,7 +14,7 @@
 #endif
 
 #include "def.hpp"   // INVALID_SOCKET, ID_INVALID
-#include "utils.hpp" // psend, sconnect, sendString
+#include "utils.hpp" // Send, sconnect, sendString
 #include "type.hpp"  // id_t
 
 namespace ch {
@@ -189,7 +189,7 @@ namespace ch {
     inline void ObjectOutputStream<DataType>::sendStopSignal(void) {
 
         const id_t id_invalid = ID_INVALID;
-        psend(_sockfd, static_cast<const void *>(&id_invalid), sizeof(id_t));
+        Send(_sockfd, static_cast<const void *>(&id_invalid), sizeof(id_t));
 
     }
 
@@ -264,7 +264,7 @@ namespace ch {
         std::lock_guard<std::mutex> holder{lock};
 #endif
 
-        if (psend(_sockfd, static_cast<const void *>(&id), sizeof(id_t))) {
+        if (Send(_sockfd, static_cast<const void *>(&id), sizeof(id_t))) {
             return v.send(_sockfd);
         } else {
             DSS("ObjectOutputStream: Failed sending " << v);
@@ -328,7 +328,7 @@ namespace ch {
 
         id_t id = ID_INVALID;
 
-        if (precv(_sockfd, static_cast<void *>(&id), sizeof(id_t))) {
+        if (Recv(_sockfd, static_cast<void *>(&id), sizeof(id_t))) {
             if (id == DataType::getId()) {
                 DataType * v = new DataType{};
 

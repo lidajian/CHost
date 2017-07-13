@@ -17,7 +17,7 @@
 #include "def.hpp"        // ipconfig_t
 #include "splitter.hpp"   // Splitter
 #include "utils.hpp"      // sconnect, getWorkingDirectory, receiveFile, invokeWorker,
-                          // readFileAsString, sconnect, sendString, precv, psend,
+                          // readFileAsString, sconnect, sendString, Recv, Send,
                           // cancelWorker
 #include "threadPool.hpp" // ThreadPool
 

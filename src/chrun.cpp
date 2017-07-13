@@ -6,7 +6,7 @@
 #include <fstream>   // ifstream, ofstream
 #include <chrono>    // system_clock, duration_cast, milliseconds
 
-#include "utils.hpp" // isValidIP_v4, precv, fileExist, getWorkingDirectory,
+#include "utils.hpp" // isValidIP_v4, Recv, fileExist, getWorkingDirectory,
                      // randomString,sconnect, invokeMaster, sendString
 
 // Index IPs in configuration file
@@ -92,7 +92,7 @@ void getResult(const int sockfd) {
 
     char c;
 
-    if (!ch::precv(sockfd, static_cast<void *>(&c), sizeof(char))) {
+    if (!ch::Recv(sockfd, static_cast<void *>(&c), sizeof(char))) {
         P("No response from the server.");
     } else if (c == RES_SUCCESS) {
         P("Job Succeed.");

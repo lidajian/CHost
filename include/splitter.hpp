@@ -11,7 +11,7 @@
 #include <string.h>  // memmove
 
 #include "def.hpp"   // DATA_BLOCK_SIZE, IS_ESCAPER
-#include "utils.hpp" // pfread
+#include "utils.hpp" // Fread
 
 namespace ch {
 

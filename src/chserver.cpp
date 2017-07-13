@@ -203,7 +203,7 @@ void serve(const int sockfd) {
     if (sockfd > 0) { // the socket with the RPC caller
         char c;
 
-        if (ch::precv(sockfd, static_cast<void *>(&c), sizeof(char))) {
+        if (ch::Recv(sockfd, static_cast<void *>(&c), sizeof(char))) {
             P("Job accepted.");
             if (c == CALL_MASTER) {
                 if (!asMaster(sockfd)) {

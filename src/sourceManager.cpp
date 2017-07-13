@@ -167,10 +167,10 @@ namespace ch {
                 std::string split;
                 ssize_t endSize = INVALID;
 
-                while (precv(sockfd, static_cast<void *>(&receivedChar), sizeof(char))) {
+                while (Recv(sockfd, static_cast<void *>(&receivedChar), sizeof(char))) {
                     if (receivedChar == CALL_POLL) {
                         if (!(this->splitter.next(split))) { // end service by server
-                            psend(sockfd, static_cast<void *>(&endSize), sizeof(ssize_t));
+                            Send(sockfd, static_cast<void *>(&endSize), sizeof(ssize_t));
                             break;
                         }
                         if (!sendString(sockfd, split)) {
@@ -181,7 +181,7 @@ namespace ch {
                     }
                 }
 
-                if (!precv(sockfd, static_cast<void *>(&receivedChar), sizeof(char))) {
+                if (!Recv(sockfd, static_cast<void *>(&receivedChar), sizeof(char))) {
                     E("(SourceManagerMaster) No response from worker.");
                     close(sockfd);
                     return;
@@ -203,10 +203,10 @@ namespace ch {
                         std::string split;
                         ssize_t endSize = INVALID;
 
-                        while (precv(sockfd, static_cast<void *>(&receivedChar), sizeof(char))) {
+                        while (Recv(sockfd, static_cast<void *>(&receivedChar), sizeof(char))) {
                             if (receivedChar == CALL_POLL) {
                                 if (!(this->splitter.next(split))) { // end service by server
-                                    psend(sockfd, static_cast<void *>(&endSize), sizeof(ssize_t));
+                                    Send(sockfd, static_cast<void *>(&endSize), sizeof(ssize_t));
                                     break;
                                 }
                                 if (!sendString(sockfd, split)) {
@@ -217,7 +217,7 @@ namespace ch {
                             }
                         }
 
-                        if (!precv(sockfd, static_cast<void *>(&receivedChar), sizeof(char))) {
+                        if (!Recv(sockfd, static_cast<void *>(&receivedChar), sizeof(char))) {
                             E("(SourceManagerMaster) No response from worker.");
                             close(sockfd);
                             return;
@@ -344,7 +344,7 @@ namespace ch {
                             if (repliedEOF[sockfd]) {
                                 char receivedChar = RES_FAIL;
 
-                                if (!precv(sockfd, static_cast<void *>(&receivedChar), sizeof(char))) {
+                                if (!Recv(sockfd, static_cast<void *>(&receivedChar), sizeof(char))) {
                                     E("(SourceManagerMaster) No response from worker.");
                                     ++endedConnection;
                                     close(sockfd);
@@ -362,7 +362,7 @@ namespace ch {
                                 // provide poll service
                                 char receivedChar;
 
-                                if (!precv(sockfd, static_cast<void *>(&receivedChar), sizeof(char))) {
+                                if (!Recv(sockfd, static_cast<void *>(&receivedChar), sizeof(char))) {
                                     ++endedConnection;
                                     close(sockfd);
                                 } else {
@@ -373,7 +373,7 @@ namespace ch {
                                             if (!(this->splitter.next(split))) { // end service by server
                                                 ssize_t endSize = INVALID;
                                                 repliedEOF[sockfd] = true;
-                                                psend(sockfd, static_cast<void *>(&endSize), sizeof(ssize_t));
+                                                Send(sockfd, static_cast<void *>(&endSize), sizeof(ssize_t));
                                             } else if (!sendString(sockfd, split)) {
                                                 E("(SourceManagerMaster) Failed to send split.");
                                                 ++endedConnection;
@@ -452,7 +452,7 @@ namespace ch {
     bool SourceManagerWorker::pollRequest() const {
 
         const char c = CALL_POLL;
-        return psend(fd, static_cast<const void *>(&c), sizeof(char));
+        return Send(fd, static_cast<const void *>(&c), sizeof(char));
 
     }
 

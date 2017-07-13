@@ -27,16 +27,16 @@ namespace ch {
      */
 
     // Send with given length
-    bool psend(int fd, const void * buffer, size_t len);
+    bool Send(int fd, const void * buffer, size_t len);
 
     // Receive with given length
-    bool precv(int fd, void * buffer, size_t len);
+    bool Recv(int fd, void * buffer, size_t len);
 
     // fwrite with given length
-    bool pfwrite(FILE * fd, const void * buffer, size_t len);
+    bool Fwrite(FILE * fd, const void * buffer, size_t len);
 
     // fread with given length
-    bool pfread(FILE * fd, void * buffer, size_t len);
+    bool Fread(FILE * fd, void * buffer, size_t len);
 
     /*
      * Network functions

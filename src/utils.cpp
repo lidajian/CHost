@@ -7,7 +7,7 @@ namespace ch {
      */
 
     // Send with given length
-    bool psend(int fd, const void * buffer, size_t len) {
+    bool Send(int fd, const void * buffer, size_t len) {
 
         off_t offset = 0;
         const char * cbuf = reinterpret_cast<const char *>(buffer);
@@ -30,7 +30,7 @@ namespace ch {
     }
 
     // Receive with given length
-    bool precv(int fd, void * buffer, size_t len) {
+    bool Recv(int fd, void * buffer, size_t len) {
 
         off_t offset = 0;
         char * cbuf = reinterpret_cast<char *>(buffer);
@@ -53,7 +53,7 @@ namespace ch {
     }
 
     // fwrite with given length
-    bool pfwrite(FILE * fd, const void * buffer, size_t len) {
+    bool Fwrite(FILE * fd, const void * buffer, size_t len) {
 
         off_t offset = 0;
         const char * cbuf = reinterpret_cast<const char *>(buffer);
@@ -74,7 +74,7 @@ namespace ch {
     }
 
     // fread with given length
-    bool pfread(FILE * fd, void * buffer, size_t len) {
+    bool Fread(FILE * fd, void * buffer, size_t len) {
 
         off_t offset = 0;
         char * cbuf = reinterpret_cast<char *>(buffer);
@@ -282,7 +282,7 @@ namespace ch {
             return false;
         }
 
-        if (psend(sockfd, static_cast<const void *>(&fileSize), sizeof(ssize_t)) && fileSize > 0 ) {
+        if (Send(sockfd, static_cast<const void *>(&fileSize), sizeof(ssize_t)) && fileSize > 0 ) {
             ssize_t sentSize = 0;
             ssize_t byteLeft, toSend;
 
@@ -290,11 +290,11 @@ namespace ch {
                 byteLeft = fileSize - sentSize;
                 toSend = MIN_VAL(byteLeft, BUFFER_SIZE);
 
-                if (!pfread(fd, buffer, toSend)) {
+                if (!Fread(fd, buffer, toSend)) {
                     D("(sendFile) Unexepected EOF.");
                     fclose(fd);
                     return false;
-                } else if (psend(sockfd, static_cast<const void *>(buffer), toSend)){
+                } else if (Send(sockfd, static_cast<const void *>(buffer), toSend)){
                     sentSize += toSend;
                 } else {
                     D("(sendFile) Broken pipe.");
@@ -332,7 +332,7 @@ namespace ch {
 
         ssize_t fileSize;
 
-        if (precv(sockfd, static_cast<void *>(&fileSize), sizeof(ssize_t)) && fileSize > 0) {
+        if (Recv(sockfd, static_cast<void *>(&fileSize), sizeof(ssize_t)) && fileSize > 0) {
             ssize_t receivedSize = 0;
             ssize_t byteLeft, toReceive;
 
@@ -340,8 +340,8 @@ namespace ch {
                 byteLeft = fileSize - receivedSize;
                 toReceive = MIN_VAL(byteLeft, BUFFER_SIZE);
 
-                if (precv(sockfd, static_cast<void *>(buffer), toReceive)) {
-                    if (!pfwrite(fd, buffer, toReceive)) {
+                if (Recv(sockfd, static_cast<void *>(buffer), toReceive)) {
+                    if (!Fwrite(fd, buffer, toReceive)) {
                         D("(receiveFile) Cannot write file.");
                         fclose(fd);
                         return false;
@@ -371,7 +371,7 @@ namespace ch {
 
         const ssize_t strSize = str.size();
 
-        if (psend(sockfd, static_cast<const void *>(&strSize), sizeof(ssize_t)) && strSize > 0) {
+        if (Send(sockfd, static_cast<const void *>(&strSize), sizeof(ssize_t)) && strSize > 0) {
             const char * strStart = str.data();
             ssize_t sentSize = 0;
             ssize_t byteLeft, toSend;
@@ -379,7 +379,7 @@ namespace ch {
             do {
                 byteLeft = strSize - sentSize;
                 toSend = MIN_VAL(byteLeft, BUFFER_SIZE);
-                if (!psend(sockfd, static_cast<const void *>(strStart + sentSize), toSend)) {
+                if (!Send(sockfd, static_cast<const void *>(strStart + sentSize), toSend)) {
                     D("(sendString) Broken pipe.");
                     return false;
                 }
@@ -401,7 +401,7 @@ namespace ch {
         char buffer[BUFFER_SIZE];
         ssize_t strSize;
 
-        if (precv(sockfd, static_cast<void *>(&strSize), sizeof(ssize_t)) && strSize > 0) {
+        if (Recv(sockfd, static_cast<void *>(&strSize), sizeof(ssize_t)) && strSize > 0) {
             str.reserve(strSize);
             ssize_t receivedSize = 0;
             ssize_t byteLeft, toReceive;
@@ -409,7 +409,7 @@ namespace ch {
             do {
                 byteLeft = strSize - receivedSize;
                 toReceive = MIN_VAL(byteLeft, BUFFER_SIZE);
-                if (precv(sockfd, static_cast<void *>(buffer), toReceive)) {
+                if (Recv(sockfd, static_cast<void *>(buffer), toReceive)) {
                     str.append(buffer, toReceive);
                     receivedSize += toReceive;
                 } else {
@@ -518,7 +518,7 @@ namespace ch {
         size_t size = tempSize;
         str.resize(size);
 
-        if (!pfread(fd, &str[0], size)) {
+        if (!Fread(fd, &str[0], size)) {
             D("(readFileAsString) Cannot read the file.");
             fclose(fd);
             return false;
@@ -568,12 +568,12 @@ namespace ch {
             byteLeft = fileSize - copiedSize;
             toCopy = MIN_VAL(byteLeft, BUFFER_SIZE);
 
-            if (!pfread(srcfd, buffer, toCopy)) {
+            if (!Fread(srcfd, buffer, toCopy)) {
                 D("(Copy) Unexepected EOF.");
                 fclose(srcfd);
                 fclose(destfd);
                 return false;
-            } else if (pfwrite(destfd, buffer, toCopy)){
+            } else if (Fwrite(destfd, buffer, toCopy)){
                 copiedSize += toCopy;
             } else {
                 D("(Copy) Broken pipe.");
@@ -621,7 +621,7 @@ namespace ch {
     bool invokeMaster(const int fd) {
 
         const char c = CALL_MASTER;
-        return psend(fd, static_cast<const void *>(&c), sizeof(char));
+        return Send(fd, static_cast<const void *>(&c), sizeof(char));
 
     }
 
@@ -629,7 +629,7 @@ namespace ch {
     bool invokeWorker(int fd) {
 
         const char c = CALL_WORKER;
-        return psend(fd, static_cast<const void *>(&c), sizeof(char));
+        return Send(fd, static_cast<const void *>(&c), sizeof(char));
 
     }
 
@@ -637,7 +637,7 @@ namespace ch {
     bool cancelWorker(int fd) {
 
         const char c = CALL_CANCEL;
-        return psend(fd, static_cast<const void *>(&c), sizeof(char));
+        return Send(fd, static_cast<const void *>(&c), sizeof(char));
 
     }
 
@@ -646,7 +646,7 @@ namespace ch {
     void sendSuccess(const int sockfd) {
 
         const char c = RES_SUCCESS;
-        ch::psend(sockfd, static_cast<const void *>(&c), sizeof(char));
+        ch::Send(sockfd, static_cast<const void *>(&c), sizeof(char));
 
     }
 
@@ -654,7 +654,7 @@ namespace ch {
     void sendFail(const int sockfd) {
 
         const char c = RES_FAIL;
-        ch::psend(sockfd, static_cast<const void *>(&c), sizeof(char));
+        ch::Send(sockfd, static_cast<const void *>(&c), sizeof(char));
 
     }
 

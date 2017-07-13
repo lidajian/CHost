@@ -10,7 +10,7 @@
 #include <fstream>    // ifstream, ofstream
 
 #include "def.hpp"    // ID_xxx
-#include "utils.hpp"  // precv, psend, sendString, receiveString
+#include "utils.hpp"  // Recv, Send, sendString, receiveString
 #include "murmur.hpp" // murmur2
 
 namespace ch {
@@ -99,10 +99,10 @@ namespace ch {
                 return ID_INTEGER;
             }
             bool send(int fd) const {
-                return psend(fd, static_cast<const void *>(&value), sizeof(int));
+                return Send(fd, static_cast<const void *>(&value), sizeof(int));
             }
             bool recv(int fd) {
-                return precv(fd, static_cast<void *>(&value), sizeof(int));
+                return Recv(fd, static_cast<void *>(&value), sizeof(int));
             }
             std::ifstream & read(std::ifstream & is) {
                 is.read(reinterpret_cast<char *>(&value), sizeof(int));
