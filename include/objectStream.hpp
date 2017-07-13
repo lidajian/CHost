@@ -9,6 +9,10 @@
 
 #include <string>    // string
 
+#ifdef MULTIPLE_MAPPER
+#include <mutex>     // mutex, lock_guard
+#endif
+
 #include "def.hpp"   // INVALID_SOCKET, ID_INVALID
 #include "utils.hpp" // psend, sconnect, sendString
 #include "type.hpp"  // id_t
@@ -67,6 +71,11 @@ namespace ch {
 
         protected:
 
+#ifdef MULTIPLE_MAPPER
+            // Lock of socket (exclusive send)
+            std::mutex lock;
+#endif
+
             void sendStopSignal(void);
 
         public:
@@ -100,7 +109,7 @@ namespace ch {
             void close(void);
 
             // Send data through socket
-            bool send(const DataType & v) const ;
+            bool send(const DataType & v);
 
             // Send string through socket
             bool sendString(const std::string & str) const ;
@@ -245,11 +254,15 @@ namespace ch {
 
     // Send data through socket
     template <typename DataType>
-    bool ObjectOutputStream<DataType>::send(const DataType & v) const {
+    bool ObjectOutputStream<DataType>::send(const DataType & v) {
 
         DSS("ObjectOutputStream: Sending " << v);
 
         id_t id = DataType::getId();
+
+#ifdef MULTIPLE_MAPPER
+        std::lock_guard<std::mutex> holder{lock};
+#endif
 
         if (psend(_sockfd, static_cast<const void *>(&id), sizeof(id_t))) {
             return v.send(_sockfd);
