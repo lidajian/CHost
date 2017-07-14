@@ -3,9 +3,9 @@ BUILD_PREFIX = ../../bin
 TEMP_PREFIX = ../../tmp
 
 CXX = g++
-CFLAGS += -D _SUGGEST -D _ERROR -Wall -std=c++11 -fPIC -I$(INC_DIR)
+CFLAGS += -D _SUGGEST -D _ERROR -Wall -std=c++1z -fPIC -I$(INC_DIR)
 # CFLAGS += -D _DEBUG
-CFLAGS += -D MULTIPLE_MAPPER
+CFLAGS += -D MULTITHREAD_SUPPORT
 LDFLAGS += -shared
 OBJS = sourceManager utils splitter threadPool
 OBJS_PATHS = $(foreach OBJ, $(OBJS), $(TEMP_PREFIX)/$(OBJ).o)

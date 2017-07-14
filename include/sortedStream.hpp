@@ -27,7 +27,7 @@ namespace ch {
         bool operator()(const std::pair<DataType_1, DataType_2> & l,
                         const std::pair<DataType_1, DataType_2> & r) {
 
-            if (greater) {
+            if constexpr (greater) {
                 return l.first > r.first;
             } else {
                 return l.first < r.first;
@@ -73,6 +73,9 @@ namespace ch {
             // Destructor
             ~SortedStream();
 
+            // Open stream
+            bool open();
+
             // True if the stream has data
             bool isValid() const;
 
@@ -90,19 +93,6 @@ namespace ch {
     : _files{std::move(files)} {
 
         files.clear();
-        DataType temp;
-
-        for (const std::string & file: _files) {
-            std::shared_ptr<std::ifstream> is{new std::ifstream{file}};
-            if ((*is) && ((*is) >> temp)) {
-                minHeap.push(std::make_pair<DataType, std::shared_ptr<std::ifstream> >
-                                (
-                                    std::move(temp),
-                                    std::move(is)
-                                )
-                            );
-            }
-        }
 
     }
 
@@ -111,20 +101,10 @@ namespace ch {
     template <typename FileIter_T>
     SortedStream<DataType>::SortedStream(const FileIter_T & begin, const FileIter_T & end) {
 
-        DataType temp;
         FileIter_T it = begin;
 
         while (it < end) {
-            std::shared_ptr<std::ifstream> is{new std::ifstream{*it}};
             _files.push_back(std::move(*it));
-            if ((*is) && ((*is) >> temp)) {
-                minHeap.push(std::make_pair<DataType, std::shared_ptr<std::ifstream> >
-                                (
-                                    std::move(temp),
-                                    std::move(is)
-                                )
-                            );
-            }
             ++it;
         }
 
@@ -161,6 +141,28 @@ namespace ch {
         for (const std::string & file: _files) {
             unlink(file.c_str());
         }
+
+    }
+
+    // Open stream
+    template <typename DataType>
+    bool SortedStream<DataType>::open() {
+
+        DataType temp;
+
+        for (const std::string & file: _files) {
+            std::shared_ptr<std::ifstream> is{new std::ifstream{file}};
+            if ((*is) && ((*is) >> temp)) {
+                minHeap.push(std::make_pair<DataType, std::shared_ptr<std::ifstream> >
+                                (
+                                    std::move(temp),
+                                    std::move(is)
+                                )
+                            );
+            }
+        }
+
+        return isValid();
 
     }
 

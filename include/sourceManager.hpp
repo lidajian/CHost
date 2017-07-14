@@ -109,7 +109,7 @@ namespace ch {
             // Socket file descriptor
             int fd;
 
-#ifdef MULTIPLE_MAPPER
+#ifdef MULTITHREAD_SUPPORT
             // Mutex for poll
             std::mutex lock;
 #endif

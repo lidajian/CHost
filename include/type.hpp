@@ -25,15 +25,15 @@ namespace ch {
             virtual ~TypeBase() {}
 
             // Get id of the object
-            inline static id_t getId(void) {
+            inline static id_t getId() {
                 return ID_INVALID;
             }
 
             // Internal hash code for tuple
-            virtual int _hashCode(void) = 0;
+            virtual int _hashCode() = 0;
 
             // Get hash code of the object
-            virtual int hashCode(void) = 0;
+            virtual int hashCode() = 0;
 
             // Get string representation of the object
             virtual std::string toString() const = 0;
@@ -86,16 +86,16 @@ namespace ch {
             ~Integer() {}
 
             // Virtual functions implementation
-            inline int _hashCode(void) {
+            inline int _hashCode() {
                 return murmur2(value);
             }
-            int hashCode(void) {
+            int hashCode() {
                 return _hashCode();
             }
-            std::string toString(void) const {
+            std::string toString() const {
                 return std::to_string(value);
             }
-            inline static id_t getId(void) {
+            inline static id_t getId() {
                 return ID_INTEGER;
             }
             bool send(int fd) const {
@@ -176,20 +176,20 @@ namespace ch {
             ~String() {}
 
             // Virtual functions implementation
-            inline int _hashCode(void) {
+            inline int _hashCode() {
                 return murmur2(value);
             }
-            int hashCode(void) {
+            int hashCode() {
                 if (!hashGot) {
                     hash = _hashCode();
                     hashGot = true;
                 }
                 return hash;
             }
-            std::string toString(void) const {
+            std::string toString() const {
                 return "\"" + value + "\"";
             }
-            inline static id_t getId(void) {
+            inline static id_t getId() {
                 return ID_STRING;
             }
             bool send(int fd) const {
@@ -286,16 +286,16 @@ namespace ch {
 
             // Called if it is in first field of a root tuple
             // Hash that take all fields into account
-            inline int _hashCode(void) {
+            inline int _hashCode() {
                 return first._hashCode() ^ second._hashCode();
             }
-            int hashCode(void) {
+            int hashCode() {
                 return first._hashCode();
             }
             std::string toString() const {
                 return "(" + first.toString() + ", " + second.toString() + ")";
             }
-            inline static id_t getId(void) {
+            inline static id_t getId() {
                 return (DataType_1::getId() << 3) ^ DataType_2::getId();
             }
             bool send(int fd) const {

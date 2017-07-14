@@ -92,7 +92,7 @@ bool asWorker(const int sockfd) {
             if (ch::readIPs(confFilePath, ips)) {
                 // do job
                 const std::string outputFilePath;
-#ifdef MULTIPLE_MAPPER
+#ifdef MULTITHREAD_SUPPORT
                 ch::context_t context(ips, source, outputFilePath, workingDir, jobName, false, true);
 #else
                 ch::context_t context(ips, source, outputFilePath, workingDir, jobName, false, false);
@@ -169,7 +169,7 @@ bool asMaster(int sockfd) {
         source.startDistributionThread();
 
         // do job
-#ifdef MULTIPLE_MAPPER
+#ifdef MULTITHREAD_SUPPORT
         ch::context_t context(ips, source, outputFilePath, workingDir, jobName, true, true);
 #else
         ch::context_t context(ips, source, outputFilePath, workingDir, jobName, true, false);

@@ -4,16 +4,17 @@
 
 namespace ch {
 
-    void mapper(std::string & block, StreamManager<Tuple<String, Integer> > & sm) {
+    void mapper(std::string & block, const Emitter<Tuple<String, Integer> > & emitter) {
         std::stringstream ss(block);
         Tuple<String, Integer> res;
         (res.second).value = 1;
         while (ss >> ((res.first).value)) {
-            sm.push(res);
+            emitter.emit(res);
         }
     }
 
-    void reducer(SortedStream<Tuple<String, Integer> > & ss, StreamManager<Tuple<String, Integer> > & sm) {
+    void reducer(SortedStream<Tuple<String, Integer> > & ss,
+                 const Emitter<Tuple<String, Integer> > & emitter) {
         bool started = false;
         Tuple<String, Integer> res;
         Tuple<String, Integer> e;
@@ -26,14 +27,14 @@ namespace ch {
                     res += e;
                 } else {
                     DSS("Emit: " << res.toString());
-                    sm.push(res);
+                    emitter.emit(res);
                     res = e;
                 }
             }
         }
         if (started) {
             DSS("Emit: " << res.toString());
-            sm.push(res);
+            emitter.emit(res);
         }
     }
 

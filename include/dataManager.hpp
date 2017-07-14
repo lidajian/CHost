@@ -79,6 +79,8 @@ namespace ch {
             UnsortedStream<DataType> * getUnsortedStream ();
 
             void setPresort(bool presort);
+
+            LocalFileManager<DataType> * getFileManager();
     };
 
     /********************************************
@@ -162,10 +164,6 @@ namespace ch {
     template <typename DataType>
     SortedStream<DataType> * DataManager<DataType>::getSortedStream() {
 
-        if (!_presort) {
-            return nullptr;
-        }
-
         std::lock_guard<std::mutex> holder{_dataLock};
 
         if (_data.size() != 0) {
@@ -202,6 +200,11 @@ namespace ch {
 
         _presort = presort;
 
+    }
+
+    template <typename DataType>
+    LocalFileManager<DataType> * DataManager<DataType>::getFileManager() {
+        return &fileManager;
     }
 }
 

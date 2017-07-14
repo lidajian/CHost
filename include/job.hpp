@@ -5,14 +5,19 @@
 #ifndef JOB_H
 #define JOB_H
 
-#include <string> // string
-#include <vector> // vector
-#include <memory> // unique_ptr
-#include <thread> // thread
+#include <string>               // string
+#include <vector>               // vector
+#include <memory>               // unique_ptr
+#include <thread>               // thread
+#include <fstream>              // ofstream
 
-#include "def.hpp" // ipconfig_t
-#include "sourceManager.hpp" // SourceManager
-#include "streamManager.hpp" // StreamManager
+#include "def.hpp"              // ipconfig_t
+#include "sourceManager.hpp"    // SourceManager
+#include "sortedStream.hpp"     // SortedStream
+#include "streamManager.hpp"    // StreamManager, ClusterEmitter
+#include "localFileManager.hpp" // LocalFileManager
+#include "emitter.hpp"          // LocalEmitter
+#include "threadPool.hpp"       // ThreadPool
 
 namespace ch {
 
@@ -26,7 +31,7 @@ namespace ch {
         const std::string & _workingDir;
         const std::string & _jobName;
         const bool _isServer;
-        const bool _supportMultipleMapper;
+        const bool _supportMultithread;
 
         explicit context_t(const ipconfig_t & ips,
                            ch::SourceManager & source,
@@ -34,10 +39,10 @@ namespace ch {
                            const std::string & workingDir,
                            const std::string & jobName,
                            const bool isServer = false,
-                           const bool supportMultipleMapper = false)
+                           const bool supportMultithread = false)
         : _ips(ips), _source(source), _outputFilePath(outputFilePath),
           _workingDir(workingDir), _jobName(jobName), _isServer(isServer),
-          _supportMultipleMapper(supportMultipleMapper) {}
+          _supportMultithread(supportMultithread) {}
     };
 
     // Job function type
@@ -47,7 +52,7 @@ namespace ch {
      * Default mapper definition
      */
     template <typename MapperOutputType>
-    void mapper(std::string & block, StreamManager<MapperOutputType> & sm) {
+    void mapper(std::string & block, const Emitter<MapperOutputType> & emitter) {
 
         E("Cannot find mapper function.");
         return;
@@ -58,7 +63,7 @@ namespace ch {
      * Default reducer definition
      */
     template <typename ReducerInputType, typename ReducerOutputType>
-    void reducer(SortedStream<ReducerInputType> & ss, StreamManager<ReducerOutputType> & sm) {
+    void reducer(SortedStream<ReducerInputType> & ss, const Emitter<ReducerOutputType> & emitter) {
 
         E("Cannot find reducer function.");
         return;
@@ -87,14 +92,16 @@ namespace ch {
             return false;
         }
 
+        const ClusterEmitter<MapperReducerOutputType> & emitter = stm.getEmitter();
+
         // Map
-#ifndef MULTIPLE_MAPPER
+#ifndef MULTITHREAD_SUPPORT
         std::string polled;
         while (context._source.poll(polled)) {
-            mapper(polled, stm);
+            mapper(polled, emitter);
         }
 #else
-        if (context._supportMultipleMapper) {
+        if (context._supportMultithread) {
             std::vector<std::thread> mappers;
             std::vector<std::string> polleds(NUM_MAPPER);
             SourceManager & source = context._source;
@@ -102,9 +109,9 @@ namespace ch {
             for (size_t i = 0; i < NUM_MAPPER; ++i) {
                 std::string & polled = polleds[i];
 
-                mappers.emplace_back([&source, &polled, &stm](){
+                mappers.emplace_back([&source, &polled, &emitter](){
                     while (source.poll(polled)) {
-                        mapper(polled, stm);
+                        mapper(polled, emitter);
                     }
                 });
             }
@@ -115,7 +122,7 @@ namespace ch {
             std::string polled;
 
             while (context._source.poll(polled)) {
-                mapper(polled, stm);
+                mapper(polled, emitter);
             }
         }
 #endif
@@ -123,10 +130,12 @@ namespace ch {
         stm.blockTillRecvEnd();
         // End of map
 
-        SortedStream<MapperReducerOutputType> * sorted = stm.getSortedStream();
-        std::unique_ptr<SortedStream<MapperReducerOutputType> > _sorted{sorted};
-
         stm.setPresort(false);
+
+        // Reduce
+#ifndef MULTITHREAD_SUPPORT
+        SortedStream<MapperReducerOutputType> * sorted = stm.getSortedStream();
+
         stm.startReceive();
 
         if (!stm.isReceiving()) { // Fail to start receive threads
@@ -135,11 +144,83 @@ namespace ch {
             return false;
         }
 
-        // Reduce
         if (sorted) {
+            std::unique_ptr<SortedStream<MapperReducerOutputType> > _sorted{sorted};
             stm.setPartitioner(zeroPartitioner);
-            reducer(*sorted, stm);
+            reducer(*sorted, emitter);
         }
+#else
+        if (context._supportMultithread) {
+            LocalFileManager<MapperReducerOutputType> fileManager{std::move(*stm.getFileManager())};
+
+            stm.startReceive();
+
+            if (!stm.isReceiving()) { // Fail to start receive threads
+                E("(Job) StreamManager start receive threads failed. Fail to perform"
+                  " reduce on this machine.");
+                return false;
+            }
+
+            // Iteratively reduce files
+            while (true) {
+                std::vector<std::unique_ptr<SortedStream<MapperReducerOutputType> > > &&
+                                                    sortedStreams = fileManager.getSortedStreams();
+
+                size_t nStreams = sortedStreams.size();
+
+                if (nStreams == 0) {
+                    break;
+                } else if (nStreams == 1) { // Send to master
+                    std::unique_ptr<SortedStream<MapperReducerOutputType> > &
+                                                                    sorted = sortedStreams[0];
+
+                    if (sorted->open()) {
+                        reducer(*sorted, emitter);
+                    }
+
+                    break;
+                } else { // Store locally for next iteration
+                    ThreadPool threadPool{MIN_VAL(THREAD_POOL_SIZE, nStreams)};
+                    std::vector<std::ofstream> ostms(nStreams);
+
+                    for (size_t i = 0; i < nStreams; ++i) {
+                        std::ofstream & ostm = ostms[i];
+                        fileManager.getStream(ostm);
+
+                        std::unique_ptr<SortedStream<MapperReducerOutputType> > &
+                                                                    sorted = sortedStreams[i];
+
+                        threadPool.addTask([&sorted, &ostm](){
+                            if (sorted->open()) {
+                                LocalEmitter<MapperReducerOutputType> emitter{&ostm};
+                                reducer(*sorted, emitter);
+                            }
+                        });
+                    }
+
+                    threadPool.stop();
+                    // ofstream close
+                }
+                // sortedStreams destruction
+            }
+        } else {
+            SortedStream<MapperReducerOutputType> * sorted = stm.getSortedStream();
+
+            stm.startReceive();
+
+            if (!stm.isReceiving()) { // Fail to start receive threads
+                E("(Job) StreamManager start receive threads failed. Fail to perform"
+                  " reduce on this machine.");
+                return false;
+            }
+
+            if (sorted) {
+                std::unique_ptr<SortedStream<MapperReducerOutputType> > _sorted{sorted};
+                stm.setPartitioner(zeroPartitioner);
+                reducer(*sorted, emitter);
+            }
+        }
+#endif
         stm.finalizeSend();
         stm.blockTillRecvEnd();
         // End of reduce
@@ -153,11 +234,11 @@ namespace ch {
     }
 
     /*
-     * Complete job:
+     * Complex job:
      * output type of mapper and reducer are different
      */
     template <typename MapperOutputType, typename ReducerOutputType>
-    bool completeJob(context_t & context) {
+    bool complexJob(context_t & context) {
 
         StreamManager<MapperOutputType> stm_mapper{context._ips, context._workingDir,
                                                    context._jobName, DEFAULT_MAX_DATA_SIZE};
@@ -174,14 +255,16 @@ namespace ch {
             return false;
         }
 
+        const ClusterEmitter<MapperOutputType> & emitter_mapper = stm_mapper.getEmitter();
+
         // Map
-#ifndef MULTIPLE_MAPPER
+#ifndef MULTITHREAD_SUPPORT
         std::string polled;
         while (context._source.poll(polled)) {
-            mapper(polled, stm_mapper);
+            mapper(polled, emitter_mapper);
         }
 #else
-        if (context._supportMultipleMapper) {
+        if (context._supportMultithread) {
             std::vector<std::thread> mappers;
             std::vector<std::string> polleds(NUM_MAPPER);
             SourceManager & source = context._source;
@@ -189,9 +272,9 @@ namespace ch {
             for (size_t i = 0; i < NUM_MAPPER; ++i) {
                 std::string & polled = polleds[i];
 
-                mappers.emplace_back([&source, &polled, &stm_mapper](){
+                mappers.emplace_back([&source, &polled, &emitter_mapper](){
                     while (source.poll(polled)) {
-                        mapper(polled, stm_mapper);
+                        mapper(polled, emitter_mapper);
                     }
                 });
             }
@@ -202,7 +285,7 @@ namespace ch {
             std::string polled;
 
             while (context._source.poll(polled)) {
-                mapper(polled, stm_mapper);
+                mapper(polled, emitter_mapper);
             }
         }
 #endif
@@ -210,9 +293,7 @@ namespace ch {
         stm_mapper.blockTillRecvEnd();
         // End of map
 
-        SortedStream<MapperOutputType> * sorted = stm_mapper.getSortedStream();
-        std::unique_ptr<SortedStream<MapperOutputType> > _sorted{sorted};
-
+        // Reduce
         StreamManager<ReducerOutputType> stm_reducer{context._ips, context._workingDir,
                                                 context._jobName, DEFAULT_MAX_DATA_SIZE, false};
 
@@ -229,10 +310,16 @@ namespace ch {
             return false;
         }
 
-        // Reduce
+        SortedStream<MapperOutputType> * sorted = stm_mapper.getSortedStream();
+
         if (sorted) {
+            const ClusterEmitter<ReducerOutputType> & emitter_reducer = stm_reducer.getEmitter();
+
+            std::unique_ptr<SortedStream<MapperOutputType> > _sorted{sorted};
+
             stm_reducer.setPartitioner(zeroPartitioner);
-            reducer(*sorted, stm_reducer);
+
+            reducer(*sorted, emitter_reducer);
         }
         stm_reducer.finalizeSend();
         stm_reducer.blockTillRecvEnd();

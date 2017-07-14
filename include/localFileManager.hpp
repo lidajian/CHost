@@ -10,8 +10,9 @@
 #include <vector>             // vector
 #include <string>             // string
 #include <fstream>            // ofstream
+#include <memory>             // unique_ptr
 
-#include "def.hpp"            // RANDOM_FILE_NAME_LENGTH
+#include "def.hpp"            // RANDOM_FILE_NAME_LENGTH, MERGE_SORT_WAY
 #include "sortedStream.hpp"   // SortedStream
 #include "unsortedStream.hpp" // UnsortedStream
 #include "utils.hpp"          // randomString
@@ -21,6 +22,8 @@ namespace ch {
     /********************************************
      ************** Declaration *****************
     ********************************************/
+
+    typedef std::vector<std::string>::iterator FileIter;
 
     typedef std::vector<std::string>::reverse_iterator FileIterR;
 
@@ -80,6 +83,9 @@ namespace ch {
             // Get sorted stream with all files
             SortedStream<DataType> * getSortedStream();
 
+            // Get sorted streams grouped by MERGE_SORT_WAY files
+            std::vector<std::unique_ptr<SortedStream<DataType> > > getSortedStreams();
+
             // Get unsorted stream with all files
             UnsortedStream<DataType> * getUnsortedStream();
     };
@@ -99,6 +105,8 @@ namespace ch {
         if (!getStream(os)) {
             return false;
         }
+
+        stm.open();
 
         DataType temp;
 
@@ -328,12 +336,41 @@ namespace ch {
         }
 
         SortedStream<DataType> * ret = new SortedStream<DataType>{std::move(dumpFiles)};
-        if (ret->isValid()) {
+        if (ret->open()) {
             return ret;
         } else {
             delete ret;
             return nullptr;
         }
+
+    }
+
+    // Get sorted streams grouped by MERGE_SORT_WAY files
+    template <typename DataType>
+    std::vector<std::unique_ptr<SortedStream<DataType> > >
+        LocalFileManager<DataType>::getSortedStreams() {
+
+        std::vector<std::unique_ptr<SortedStream<DataType> > > stms;
+
+        if (dumpFiles.size() == 0) {
+            return stms;
+        }
+
+        std::vector<std::string> files{std::move(dumpFiles)};
+        dumpFiles.clear();
+
+        FileIter begin = files.begin();
+        FileIter end = files.end();
+        FileIter beforeEnd = end - MERGE_SORT_WAY;
+
+        while (begin < beforeEnd) {
+            stms.emplace_back(new SortedStream<DataType>{begin, begin + MERGE_SORT_WAY});
+            begin += MERGE_SORT_WAY;
+        }
+
+        stms.emplace_back(new SortedStream<DataType>{begin, end});
+
+        return stms;
 
     }
 

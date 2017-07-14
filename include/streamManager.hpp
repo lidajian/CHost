@@ -26,12 +26,16 @@
 #include "dataManager.hpp"  // DataManager
 #include "partitioner.hpp"  // Partitioner
 #include "threadPool.hpp"   // ThreadPool
+#include "emitter.hpp"      // Emitter
 
 namespace ch {
 
     /********************************************
      ************** Declaration *****************
     ********************************************/
+
+    template <typename DataType>
+    class ClusterEmitter;
 
     template <typename DataType>
     class StreamManager {
@@ -112,6 +116,9 @@ namespace ch {
             // Close and clear all streams
             ~StreamManager();
 
+            // Get Emitter of the StreamManager
+            ClusterEmitter<DataType> getEmitter();
+
             // True if receive threads exists
             bool isReceiving(void) const;
 
@@ -148,6 +155,29 @@ namespace ch {
 
             // Set partitioner
             void setPartitioner(const Partitioner & partitioner);
+
+            // Get file manager from data manager
+            LocalFileManager<DataType> * getFileManager();
+    };
+
+    /*
+     * Emit to machines in the cluster through StreamManager
+     */
+    template <typename DataType>
+    class ClusterEmitter: public Emitter<DataType> {
+
+        private:
+
+            // StreamManager that manages streams within cluster
+            StreamManager<DataType> * _stm;
+
+        public:
+
+            // Constructor
+            ClusterEmitter(StreamManager<DataType> * stm);
+
+            bool emit(DataType & v) const;
+
     };
 
     /********************************************
@@ -453,6 +483,12 @@ namespace ch {
 
     }
 
+    // Get Emitter of the StreamManager
+    template <typename DataType>
+    ClusterEmitter<DataType> StreamManager<DataType>::getEmitter() {
+        return ClusterEmitter<DataType>{this};
+    }
+
 
     // True if receive threads exists
     template <typename DataType>
@@ -517,7 +553,7 @@ namespace ch {
                      * More than THREAD_POOL_SIZE threads: Event loop + thread pool
                      */
 
-                    int nEvents;
+                    int nEvents{0};
                     ThreadPool threadPool{THREAD_POOL_SIZE};
 
                     std::unordered_map<int, int> fdToIndex;
@@ -532,7 +568,7 @@ namespace ch {
                         return;
                     }
 
-                    struct kevent event, events[nWorker];
+                    struct kevent event{0}, events[nWorker]{0};
 
                     for (size_t i = 0; i < nWorker; ++i) {
                         const int & conn = this->connections[i];
@@ -544,7 +580,7 @@ namespace ch {
                         return;
                     }
 
-                    struct timespec timeout;
+                    struct timespec timeout{0};
                     timeout.tv_sec = RECEIVE_TIMEOUT;
                     timeout.tv_nsec = 0;
 
@@ -574,7 +610,7 @@ namespace ch {
                         return;
                     }
 
-                    struct epoll_event event, events[nWorker];
+                    struct epoll_event event{0}, events[nWorker]{0};
                     for (size_t i = 0; i < nWorker; ++i) {
                         const int & conn = this->connections[i];
                         event.events = EPOLLIN;
@@ -615,7 +651,7 @@ namespace ch {
                         fdToIndex[conn] = i;
                     }
 
-                    struct timeval timeout;
+                    struct timeval timeout{0};
                     timeout.tv_sec = RECEIVE_TIMEOUT;
                     timeout.tv_usec = 0;
 
@@ -644,11 +680,11 @@ namespace ch {
                                             ++endedReceive;
                                         } else {
 #if defined (__CH_KQUEUE__)
-                                            struct kevent event;
+                                            struct kevent event{0};
                                             EV_SET(&event, sockfd, EVFILT_READ, EV_ENABLE, 0, 0, nullptr);
                                             Kevent(kq, &event, 1, nullptr, 0, nullptr);
 #elif defined (__CH_EPOLL__)
-                                            struct epoll_event event;
+                                            struct epoll_event event{0};
                                             event.events = EPOLLIN;
                                             event.data.fd = sockfd;
                                             epoll_ctl(ep, EPOLL_CTL_ADD, sockfd, &event);
@@ -790,6 +826,22 @@ namespace ch {
         _partitioner = std::addressof(partitioner);
 
     }
+
+    // Get file manager from data manager
+    template <typename DataType>
+    LocalFileManager<DataType> * StreamManager<DataType>::getFileManager() {
+        return _data.getFileManager();
+    }
+
+    // Constructor
+    template <typename DataType>
+    ClusterEmitter<DataType>::ClusterEmitter(StreamManager<DataType> * stm): _stm{stm} {}
+
+    template <typename DataType>
+    bool ClusterEmitter<DataType>::emit(DataType & v) const {
+        return _stm->push(v);
+    }
+
 }
 
 #endif

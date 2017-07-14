@@ -9,7 +9,7 @@
 
 #include <string>    // string
 
-#ifdef MULTIPLE_MAPPER
+#ifdef MULTITHREAD_SUPPORT
 #include <mutex>     // mutex, lock_guard
 #endif
 
@@ -57,10 +57,10 @@ namespace ch {
             virtual ~ObjectStream();
 
             // Close the connection
-            virtual void close(void) = 0;
+            virtual void close() = 0;
 
             // True if the socket is valid
-            bool isValid(void) const ;
+            bool isValid() const ;
     };
 
     /*
@@ -71,12 +71,12 @@ namespace ch {
 
         protected:
 
-#ifdef MULTIPLE_MAPPER
+#ifdef MULTITHREAD_SUPPORT
             // Lock of socket (exclusive send)
             std::mutex lock;
 #endif
 
-            void sendStopSignal(void);
+            void sendStopSignal();
 
         public:
 
@@ -106,7 +106,7 @@ namespace ch {
 
             // Send signal that causes ObjectInputStream::recv return nullptr
             // close the connection as well
-            void close(void);
+            void close();
 
             // Send data through socket
             bool send(const DataType & v);
@@ -142,11 +142,11 @@ namespace ch {
             ~ObjectInputStream();
 
             // Close the connection
-            void close(void);
+            void close();
 
             // Receive data, return pointer to data if success
             // return nullptr if failed
-            DataType * recv(void) const;
+            DataType * recv() const;
     };
 
     /********************************************
@@ -179,14 +179,14 @@ namespace ch {
     ObjectStream::~ObjectStream() {}
 
     // True if the socket is valid
-    inline bool ObjectStream::isValid(void) const {
+    inline bool ObjectStream::isValid() const {
 
         return _sockfd != INVALID_SOCKET;
 
     }
 
     template <typename DataType>
-    inline void ObjectOutputStream<DataType>::sendStopSignal(void) {
+    inline void ObjectOutputStream<DataType>::sendStopSignal() {
 
         const id_t id_invalid = ID_INVALID;
         Send(_sockfd, static_cast<const void *>(&id_invalid), sizeof(id_t));
@@ -242,7 +242,7 @@ namespace ch {
     // Send signal that causes ObjectInputStream::recv return nullptr
     // close the connection as well
     template <typename DataType>
-    void ObjectOutputStream<DataType>::close(void) {
+    void ObjectOutputStream<DataType>::close() {
 
         if (isValid()) {
             sendStopSignal();
@@ -260,7 +260,7 @@ namespace ch {
 
         id_t id = DataType::getId();
 
-#ifdef MULTIPLE_MAPPER
+#ifdef MULTITHREAD_SUPPORT
         std::lock_guard<std::mutex> holder{lock};
 #endif
 
@@ -312,7 +312,7 @@ namespace ch {
 
     // Close the connection
     template <typename DataType>
-    void ObjectInputStream<DataType>::close(void) {
+    void ObjectInputStream<DataType>::close() {
 
         if (isValid()) {
             ::close(_sockfd);
@@ -324,7 +324,7 @@ namespace ch {
     // Receive data, return pointer to data if success
     // return nullptr if failed
     template <typename DataType>
-    DataType * ObjectInputStream<DataType>::recv(void) const {
+    DataType * ObjectInputStream<DataType>::recv() const {
 
         id_t id = ID_INVALID;
 

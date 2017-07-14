@@ -4,7 +4,7 @@ TEMP_PREFIX = ../tmp
 BUILD_PREFIX = ../tbin
 
 CXX = g++
-CFLAGS += -D _DEBUG -D _SUGGEST -D _ERROR -Wall -fPIC -std=c++11 -I$(INC_DIR)
+CFLAGS += -D _DEBUG -D _SUGGEST -D _ERROR -Wall -fPIC -std=c++1z -I$(INC_DIR)
 LDFLAGS += -lpthread
 OBJS = sourceManager utils splitter threadPool
 OBJS_PATHS = $(foreach OBJ, $(OBJS), $(TEMP_PREFIX)/$(OBJ).o)

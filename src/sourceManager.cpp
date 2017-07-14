@@ -534,7 +534,7 @@ namespace ch {
 
     bool SourceManagerWorker::poll(std::string & ret) {
 
-#ifdef MULTIPLE_MAPPER
+#ifdef MULTITHREAD_SUPPORT
         std::lock_guard<std::mutex> holder{lock};
 #endif
 

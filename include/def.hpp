@@ -96,6 +96,7 @@ P(tss.str().c_str())
 #define DATA_BLOCK_SIZE 65536
 #define THREAD_POOL_SIZE 4
 #define NUM_MAPPER 4
+#define NUM_REDUCER 4
 
 // Enable epoll on Linux
 #ifdef __gnu_linux__
