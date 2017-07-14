@@ -11,11 +11,13 @@
 #include <string>             // string
 #include <fstream>            // ofstream
 #include <memory>             // unique_ptr
+#include <mutex>              // lock_guard, mutex
 
 #include "def.hpp"            // RANDOM_FILE_NAME_LENGTH, MERGE_SORT_WAY
 #include "sortedStream.hpp"   // SortedStream
 #include "unsortedStream.hpp" // UnsortedStream
 #include "utils.hpp"          // randomString
+#include "threadPool.hpp"     // ThreadPool
 
 namespace ch {
 
@@ -25,12 +27,13 @@ namespace ch {
 
     typedef std::vector<std::string>::iterator FileIter;
 
-    typedef std::vector<std::string>::reverse_iterator FileIterR;
-
     template <typename DataType>
     class LocalFileManager {
 
         protected:
+
+            // Mutex for getStream
+            std::mutex lock;
 
             // Directory of dump file
             const std::string dumpFileDir;
@@ -39,14 +42,14 @@ namespace ch {
             std::vector<std::string> dumpFiles;
 
             // Sort data if there are no greater than MERGE_SORT_WAY files
-            bool unitMergeSort(const FileIterR & begin, const FileIterR & end);
+            bool unitMergeSort(const FileIter & begin, const FileIter & end);
 
             // Sort data if there are less than MERGE_SORT_WAY * MERGE_SORT_WAY files
             // and greater than MERGE_SORT_WAY files
-            bool gridMergeSort (const FileIterR & begin, const FileIterR & end);
+            bool gridMergeSort (const FileIter & begin, const FileIter & end);
 
             // Sort data if there are no less than MERGE_SORT_WAY * MERGE_SORT_WAY files
-            bool fullMergeSort (const FileIterR & begin, const FileIterR & end);
+            bool fullMergeSort (const FileIter & begin, const FileIter & end);
 
             // Entry that actually do merge sort
             bool doMergeSort ();
@@ -96,8 +99,7 @@ namespace ch {
 
     // Sort data if there are no greater than MERGE_SORT_WAY files
     template <typename DataType>
-    bool LocalFileManager<DataType>::unitMergeSort(const FileIterR & begin,
-                                                   const FileIterR & end) {
+    bool LocalFileManager<DataType>::unitMergeSort(const FileIter & begin, const FileIter & end) {
 
         SortedStream<DataType> stm{begin, end};
         std::ofstream os;
@@ -125,37 +127,56 @@ namespace ch {
     // Sort data if there are less than MERGE_SORT_WAY * MERGE_SORT_WAY files
     // and greater than MERGE_SORT_WAY files
     template <typename DataType>
-    bool LocalFileManager<DataType>::gridMergeSort (const FileIterR & begin,
-                                                    const FileIterR & end) {
+    bool LocalFileManager<DataType>::gridMergeSort (const FileIter & begin,
+                                                    const FileIter & end) {
 
         const int l = end - begin - MERGE_SORT_WAY; // reserve for all slot
         const int fullSlots = l / (MERGE_SORT_WAY - 1); // number of full merges
         const int remain = l % (MERGE_SORT_WAY - 1) + 1; // number of files to merge
-        FileIterR it = begin;
-        FileIterR next_it;
+        FileIter it = begin;
+        FileIter next_it;
+
+        ThreadPool threadPool{THREAD_POOL_SIZE};
+        int isSuccess[MERGE_SORT_WAY]{0}; // 0 if fail, 1 if success
+        size_t numThreads = 0;
 
         // Step 1: MERGE_SORT_WAY full merge
         for (int i = 0; i < fullSlots; i++) {
             next_it = it + MERGE_SORT_WAY;
-            if (!unitMergeSort(it, next_it)) {
-                return false;
-            }
+            int & suc = isSuccess[numThreads++];
+            threadPool.addTask([this, it, next_it, &suc](){
+                if (this->unitMergeSort(it, next_it)) {
+                    suc = 1;
+                }
+            });
             it = next_it;
         }
 
         // Step 2: less than MERGE_SORT_WAY merge
         if (remain > 0) {
             next_it = it + remain;
-            if (unitMergeSort(it, next_it)) {
-                return false;
-            }
+            int & suc = isSuccess[numThreads++];
+            threadPool.addTask([this, it, next_it, &suc](){
+                if (this->unitMergeSort(it, next_it)) {
+                    suc = 1;
+                }
+            });
             it = next_it;
         }
+
+        threadPool.stop();
 
         // Step 3: single files without a need to merge
         while (it < end) {
             dumpFiles.push_back(*it);
             ++it;
+        }
+
+        // Check if success
+        for (size_t i = 0; i < numThreads; ++i) {
+            if (isSuccess[i] == 0) {
+                return false;
+            }
         }
 
         return true;
@@ -164,23 +185,45 @@ namespace ch {
 
     // Sort data if there are no less than MERGE_SORT_WAY * MERGE_SORT_WAY files
     template <typename DataType>
-    bool LocalFileManager<DataType>::fullMergeSort (const FileIterR & begin,
-                                                    const FileIterR & end) {
+    bool LocalFileManager<DataType>::fullMergeSort (const FileIter & begin,
+                                                    const FileIter & end) {
 
-        FileIterR it = end;
-        FileIterR next_it = end - MERGE_SORT_WAY;
+        FileIter it = begin;
+        FileIter next_it = begin + MERGE_SORT_WAY;
 
-        while (next_it > begin) {
-            // loop invariant: index increase -> size decrease
-            if (!unitMergeSort(next_it, it)) {
-                return false;
-            }
+        ThreadPool threadPool{THREAD_POOL_SIZE};
+        int isSuccess[MERGE_SORT_WAY]{0}; // 0 if fail, 1 if success
+        size_t numThreads = 0;
+
+        while (next_it < end) {
+            int & suc = isSuccess[numThreads++];
+            threadPool.addTask([this, it, next_it, &suc](){
+                if (this->unitMergeSort(it, next_it)) {
+                    suc = 1;
+                }
+            });
 
             it = next_it;
-            next_it = it - MERGE_SORT_WAY;
+            next_it = it + MERGE_SORT_WAY;
         }
 
-        return unitMergeSort(begin, it);
+        int & suc = isSuccess[numThreads++];
+        threadPool.addTask([this, it, end, &suc](){
+            if (this->unitMergeSort(it, end)) {
+                suc = 1;
+            }
+        });
+
+        threadPool.stop();
+
+        // Check if success
+        for (size_t i = 0; i < numThreads; ++i) {
+            if (isSuccess[i] == 0) {
+                return false;
+            }
+        }
+
+        return true;
 
     }
 
@@ -196,7 +239,7 @@ namespace ch {
             std::vector<std::string> files{std::move(dumpFiles)};
             dumpFiles.clear(); // dumpFiles unspecified, clear dumpFiles
 
-            if (!fullMergeSort(files.rbegin(), files.rend())) {
+            if (!fullMergeSort(files.begin(), files.end())) {
                 return false;
             }
 
@@ -208,7 +251,7 @@ namespace ch {
             std::vector<std::string> files{std::move(dumpFiles)};
             dumpFiles.clear(); // dumpFiles unspecified, clear dumpFiles
 
-            if (!gridMergeSort(files.rbegin(), files.rend())) {
+            if (!gridMergeSort(files.begin(), files.end())) {
                 return false;
             }
 
@@ -270,24 +313,20 @@ namespace ch {
     template <typename DataType>
     bool LocalFileManager<DataType>::getStream(std::ofstream & os) {
 
-        dumpFiles.emplace_back(dumpFileDir);
-        std::string & fullPath = dumpFiles.back();
+        std::string fullPath{dumpFileDir};
         fullPath.append("/.", LENGTH_CONST_CHAR_ARRAY("/."));
-
-        // Create a valid temporary file path
-        size_t l = fullPath.size();
         fullPath += randomString(RANDOM_FILE_NAME_LENGTH);
-        while (fileExist(fullPath.c_str())) {
-            fullPath.resize(l);
-            fullPath += randomString(RANDOM_FILE_NAME_LENGTH);
-        }
 
         os.open(fullPath);
         if (!os) {
-            dumpFiles.pop_back();
             E("(LocalFileManager) Fail to create temporary file.");
             I("Check if there is no space.");
             return false;
+        }
+
+        {
+            std::lock_guard<std::mutex> holder{lock};
+            dumpFiles.push_back(std::move(fullPath));
         }
 
         return true;

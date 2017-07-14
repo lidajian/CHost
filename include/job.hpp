@@ -185,13 +185,12 @@ namespace ch {
 
                     for (size_t i = 0; i < nStreams; ++i) {
                         std::ofstream & ostm = ostms[i];
-                        fileManager.getStream(ostm);
 
                         std::unique_ptr<SortedStream<MapperReducerOutputType> > &
                                                                     sorted = sortedStreams[i];
 
-                        threadPool.addTask([&sorted, &ostm](){
-                            if (sorted->open()) {
+                        threadPool.addTask([&sorted, &ostm, &fileManager](){
+                            if (fileManager.getStream(ostm) && sorted->open()) {
                                 LocalEmitter<MapperReducerOutputType> emitter{&ostm};
                                 reducer(*sorted, emitter);
                             }
