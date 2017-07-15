@@ -53,7 +53,7 @@ namespace ch {
             return false;
         }
 
-        size_t rv = Fread(_fd, buffer + bufferedLength, DATA_BLOCK_SIZE - bufferedLength);
+        size_t rv = fread(buffer + bufferedLength, sizeof(char), DATA_BLOCK_SIZE - bufferedLength, _fd);
 
         if (rv == 0) { // EOF
             if (bufferedLength == 0) {

@@ -204,7 +204,19 @@ namespace ch {
 
     template <typename DataType>
     LocalFileManager<DataType> * DataManager<DataType>::getFileManager() {
+
+        std::lock_guard<std::mutex> holder{_dataLock};
+
+        if (_data.size() != 0) {
+            sort(std::begin(_data), std::end(_data), pointerComp);
+            if (!fileManager.dumpToFile(_data)) {
+                E("(DataManager) Fail to dump the remaining data to file.");
+                return nullptr;
+            }
+        }
+
         return &fileManager;
+
     }
 }
 

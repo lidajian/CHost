@@ -22,7 +22,7 @@ namespace ch {
     : _jobFilePath{jobFilePath} {
 
         if (readFileAsString(jobFilePath.c_str(), _jobFileContent)) {
-            if (splitter.open(dataFile.c_str())) {
+            if (!splitter.open(dataFile.c_str())) {
                 E("(SourceManagerMaster) Fail to open data file.");
             }
         } else {
