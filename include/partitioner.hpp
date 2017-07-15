@@ -16,7 +16,7 @@ namespace ch {
         public:
 
             // Get the partition
-            virtual size_t getPartition(int i, int s) const = 0;
+            virtual size_t getPartition(const int & i, const size_t & s) const = 0;
     };
 
     /*
@@ -26,11 +26,8 @@ namespace ch {
 
         public:
 
-            size_t getPartition(int i, int s) const {
-                if (i == INT_MIN) {
-                    return 0;
-                }
-                return ((i < 0) ? -i : i) % s;
+            size_t getPartition(const int & i, const size_t & s) const {
+                return (size_t)(i) % s;
             }
     } hashPartitioner;
 
@@ -41,7 +38,7 @@ namespace ch {
 
         public:
 
-            size_t getPartition(int i, int s) const {
+            constexpr size_t getPartition(const int &, const size_t &) const {
                 return 0;
             }
     } zeroPartitioner;

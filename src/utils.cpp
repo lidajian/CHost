@@ -7,7 +7,7 @@ namespace ch {
      */
 
     // Send with given length
-    bool Send(int fd, const void * buffer, size_t len) {
+    bool Send(const int & fd, const void * buffer, size_t len) {
 
         off_t offset = 0;
         const char * cbuf = reinterpret_cast<const char *>(buffer);
@@ -30,7 +30,7 @@ namespace ch {
     }
 
     // Receive with given length
-    bool Recv(int fd, void * buffer, size_t len) {
+    bool Recv(const int & fd, void * buffer, size_t len) {
 
         off_t offset = 0;
         char * cbuf = reinterpret_cast<char *>(buffer);
@@ -263,7 +263,7 @@ namespace ch {
     }
 
     // Send file through a socket
-    bool sendFile(const int sockfd, const char * file_path) {
+    bool sendFile(const int & sockfd, const char * file_path) {
 
         char buffer[BUFFER_SIZE];
 
@@ -315,7 +315,7 @@ namespace ch {
     }
 
     // Receive file from socket
-    bool receiveFile(const int sockfd, const char * file_path) {
+    bool receiveFile(const int & sockfd, const char * file_path) {
 
         char buffer[BUFFER_SIZE];
 
@@ -367,7 +367,7 @@ namespace ch {
     }
 
     // Send string through socket
-    bool sendString(const int sockfd, const std::string & str) {
+    bool sendString(const int & sockfd, const std::string & str) {
 
         const ssize_t strSize = str.size();
 
@@ -395,7 +395,7 @@ namespace ch {
     }
 
     // Receive string from socket
-    bool receiveString(const int sockfd, std::string & str) {
+    bool receiveString(const int & sockfd, std::string & str) {
 
         str.clear();
         char buffer[BUFFER_SIZE];
@@ -434,7 +434,7 @@ namespace ch {
     long getFileSize(FILE * fd) {
 
         fseek(fd, 0, SEEK_END);
-        long ret = ftell(fd);
+        const long ret = ftell(fd);
         rewind(fd);
 
         return ret;
@@ -485,7 +485,10 @@ namespace ch {
         }
         workingDir = homedir;
         workingDir += TEMP_DIR;
-        workingDir += "/" + additionalDir;
+
+        if (additionalDir.size() > 0) {
+            workingDir += "/" + additionalDir;
+        }
 
         if (!fileExist(workingDir.c_str())) {
             return Mkdir(workingDir);
@@ -507,7 +510,7 @@ namespace ch {
             return false;
         }
 
-        long tempSize = getFileSize(fd);
+        const long tempSize = getFileSize(fd);
 
         if (tempSize < 0) {
             D("(readFileAsString) Cannot get file size.");
@@ -515,7 +518,7 @@ namespace ch {
             return false;
         }
 
-        size_t size = tempSize;
+        const size_t size = tempSize;
         str.resize(size);
 
         if (!Fread(fd, &str[0], size)) {
@@ -592,7 +595,7 @@ namespace ch {
     // mkdir -p
     bool Mkdir(std::string & path) {
 
-        size_t l = path.size();
+        const size_t l = path.size();
         size_t cursor = 1;
         int rv;
 
@@ -618,32 +621,32 @@ namespace ch {
      */
 
     // Invoke master
-    bool invokeMaster(const int fd) {
+    bool invokeMaster(const int & sockfd) {
 
         const char c = CALL_MASTER;
-        return Send(fd, static_cast<const void *>(&c), sizeof(char));
+        return Send(sockfd, static_cast<const void *>(&c), sizeof(char));
 
     }
 
     // Invoke worker
-    bool invokeWorker(int fd) {
+    bool invokeWorker(const int & sockfd) {
 
         const char c = CALL_WORKER;
-        return Send(fd, static_cast<const void *>(&c), sizeof(char));
+        return Send(sockfd, static_cast<const void *>(&c), sizeof(char));
 
     }
 
     // Cancel worker
-    bool cancelWorker(int fd) {
+    bool cancelWorker(const int & sockfd) {
 
         const char c = CALL_CANCEL;
-        return Send(fd, static_cast<const void *>(&c), sizeof(char));
+        return Send(sockfd, static_cast<const void *>(&c), sizeof(char));
 
     }
 
 
     // Return success to chrun program
-    void sendSuccess(const int sockfd) {
+    void sendSuccess(const int & sockfd) {
 
         const char c = RES_SUCCESS;
         ch::Send(sockfd, static_cast<const void *>(&c), sizeof(char));
@@ -651,7 +654,7 @@ namespace ch {
     }
 
     // Return fail to chrun program
-    void sendFail(const int sockfd) {
+    void sendFail(const int & sockfd) {
 
         const char c = RES_FAIL;
         ch::Send(sockfd, static_cast<const void *>(&c), sizeof(char));
@@ -673,7 +676,7 @@ namespace ch {
         std::string ret;
         ret.reserve(l);
 
-        for (size_t i = 0; i < l; ++i) {
+        while (l--) {
             ret.push_back(char_dice());
         }
 

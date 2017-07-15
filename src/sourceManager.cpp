@@ -4,7 +4,7 @@ namespace ch {
 
     // Rearrange ipconfig to create configure files for other machines
     void SourceManagerMaster::rearrangeIPs(const ipconfig_t & ips, std::string & file,
-                                           const size_t indexToHead) {
+                                           const size_t & indexToHead) {
 
         file = std::to_string(ips[indexToHead].first) + " " + ips[indexToHead].second + "\n";
 
@@ -45,16 +45,16 @@ namespace ch {
     // Connect to workers and deliver files
     bool SourceManagerMaster::connectAndDeliver(const ipconfig_t & ips,
                                                 const std::string & jobName,
-                                                unsigned short port) {
+                                                const unsigned short port) {
 
-        size_t l = ips.size();
+        const size_t l = ips.size();
 
         if (l == 0) {
             return false;
         }
 
         connections.resize(l, INVALID_SOCKET);
-        size_t nConnections = l - 1;
+        const size_t nConnections = l - 1;
 
         if (nConnections > 0) {
 
@@ -151,7 +151,7 @@ namespace ch {
     // Start distribution thread
     void SourceManagerMaster::startDistributionThread() {
 
-        size_t l = connections.size();
+        const size_t l = connections.size();
         workerIsSuccess.resize(l, false);
 
         // Start the distribution thread
@@ -162,15 +162,15 @@ namespace ch {
                 return;
             } else if (l == 2) {
                 // Only one worker, this thread servers as distribution threads
-                int & sockfd = this->connections[1];
+                const int & sockfd = this->connections[1];
                 char receivedChar;
                 std::string split;
-                ssize_t endSize = INVALID;
+                const ssize_t endSize = INVALID;
 
                 while (Recv(sockfd, static_cast<void *>(&receivedChar), sizeof(char))) {
                     if (receivedChar == CALL_POLL) {
                         if (!(this->splitter.next(split))) { // end service by server
-                            Send(sockfd, static_cast<void *>(&endSize), sizeof(ssize_t));
+                            Send(sockfd, static_cast<const void *>(&endSize), sizeof(ssize_t));
                             break;
                         }
                         if (!sendString(sockfd, split)) {
@@ -194,19 +194,19 @@ namespace ch {
                 std::vector<std::thread> dthreads;
 
                 for (size_t i = 1; i < l; ++i) {
-                    int & sockfd = this->connections[i];
+                    const int & sockfd = this->connections[i];
 
                     dthreads.emplace_back([i, &sockfd, this](){
 
                         // provide poll service
                         char receivedChar;
                         std::string split;
-                        ssize_t endSize = INVALID;
+                        const ssize_t endSize = INVALID;
 
                         while (Recv(sockfd, static_cast<void *>(&receivedChar), sizeof(char))) {
                             if (receivedChar == CALL_POLL) {
                                 if (!(this->splitter.next(split))) { // end service by server
-                                    Send(sockfd, static_cast<void *>(&endSize), sizeof(ssize_t));
+                                    Send(sockfd, static_cast<const void *>(&endSize), sizeof(ssize_t));
                                     break;
                                 }
                                 if (!sendString(sockfd, split)) {
@@ -237,7 +237,7 @@ namespace ch {
                  * More than THREAD_POOL_SIZE threads: Event loop + thread pool
                  */
 
-                size_t nConnections = l - 1;
+                const size_t nConnections = l - 1;
                 int nEvents;
                 ThreadPool threadPool{THREAD_POOL_SIZE};
 
@@ -249,7 +249,7 @@ namespace ch {
 #if defined (__CH_KQUEUE__)
 
                 // Register events
-                int kq = kqueue();
+                const int kq = kqueue();
 
                 if (kq < 0) {
                     return;
@@ -276,12 +276,12 @@ namespace ch {
                         break;
                     } else {
                         for (int i = 0; i < nEvents; ++i) {
-                            int sockfd = events[i].ident;
+                            const int & sockfd = events[i].ident;
 
 #elif defined (__CH_EPOLL__)
 
                 // Register events
-                int ep = epoll_create1(0);
+                const int ep = epoll_create1(0);
 
                 if (ep < 0) {
                     return;
@@ -310,7 +310,7 @@ namespace ch {
                         break;
                     } else {
                         for (int i = 0; i < nEvents; ++i) {
-                            int sockfd = events[i].data.fd;
+                            const int & sockfd = events[i].data.fd;
 #else
                 // Register events
                 fd_set fdset_o, fdset;
@@ -335,14 +335,14 @@ namespace ch {
                         break;
                     } else {
                         for (size_t i = 1; i < l; ++i) {
-                            int sockfd = connections[i];
+                            const int & sockfd = connections[i];
                             if (!FD_ISSET(sockfd, &fdset_o)) {
                                 continue;
                             }
 #endif
                             // It is guaranteed that only one thread for a sockfd runs at the same time
                             if (repliedEOF[sockfd]) {
-                                char receivedChar = RES_FAIL;
+                                char receivedChar;
 
                                 if (!Recv(sockfd, static_cast<void *>(&receivedChar), sizeof(char))) {
                                     E("(SourceManagerMaster) No response from worker.");
@@ -418,7 +418,7 @@ namespace ch {
     // True if all worker success
     bool SourceManagerMaster::allWorkerSuccess() {
 
-        size_t numIPs = workerIsSuccess.size();
+        const size_t numIPs = workerIsSuccess.size();
 
         if (numIPs == 0) {
             D("(SourceManagerMaster) Cannot get worker results when no threads started.");
@@ -442,14 +442,14 @@ namespace ch {
 
     }
 
-    bool SourceManagerMaster::poll(std::string & ret) {
+    inline bool SourceManagerMaster::poll(std::string & ret) {
 
         return splitter.next(ret);
 
     }
 
     // Send poll request
-    bool SourceManagerWorker::pollRequest() const {
+    inline bool SourceManagerWorker::pollRequest() const {
 
         const char c = CALL_POLL;
         return Send(fd, static_cast<const void *>(&c), sizeof(char));
@@ -457,7 +457,7 @@ namespace ch {
     }
 
     // Constructor for worker
-    SourceManagerWorker::SourceManagerWorker(int sockfd): fd{sockfd} {}
+    SourceManagerWorker::SourceManagerWorker(const int & sockfd): fd{sockfd} {}
 
     // Copy Constructor
     SourceManagerWorker::SourceManagerWorker(const SourceManagerWorker & o): fd{o.fd} {}

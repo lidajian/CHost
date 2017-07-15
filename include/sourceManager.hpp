@@ -60,7 +60,7 @@ namespace ch {
             std::vector<bool> workerIsSuccess;
 
             // Rearrange ipconfig to create configure files for other machines
-            static void rearrangeIPs(const ipconfig_t & ips, std::string & file, const size_t indexToHead);
+            static void rearrangeIPs(const ipconfig_t & ips, std::string & file, const size_t & indexToHead);
 
         public:
 
@@ -83,7 +83,7 @@ namespace ch {
             ~SourceManagerMaster();
 
             // Connect to workers and deliver files
-            bool connectAndDeliver(const ipconfig_t & ips, const std::string & jobName, unsigned short port = SERVER_PORT);
+            bool connectAndDeliver(const ipconfig_t & ips, const std::string & jobName, const unsigned short port = SERVER_PORT);
 
             // Start distribution thread
             void startDistributionThread();
@@ -120,7 +120,7 @@ namespace ch {
         public:
 
             // Constructor for worker
-            SourceManagerWorker(int sockfd);
+            SourceManagerWorker(const int & sockfd);
 
             // Copy Constructor
             SourceManagerWorker(const SourceManagerWorker & o);

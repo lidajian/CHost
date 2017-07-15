@@ -76,7 +76,7 @@ namespace ch {
             std::mutex lock;
 #endif
 
-            void sendStopSignal();
+            void sendStopSignal() const;
 
         public:
 
@@ -102,7 +102,7 @@ namespace ch {
             bool open(const std::string & ip, unsigned short port);
 
             // Send signal that causes ObjectInputStream::recv return nullptr
-            void stop();
+            void stop() const;
 
             // Send signal that causes ObjectInputStream::recv return nullptr
             // close the connection as well
@@ -186,7 +186,7 @@ namespace ch {
     }
 
     template <typename DataType>
-    inline void ObjectOutputStream<DataType>::sendStopSignal() {
+    inline void ObjectOutputStream<DataType>::sendStopSignal() const {
 
         const id_t id_invalid = ID_INVALID;
         Send(_sockfd, static_cast<const void *>(&id_invalid), sizeof(id_t));
@@ -231,7 +231,7 @@ namespace ch {
 
     // Send signal that causes ObjectInputStream::recv return nullptr
     template <typename DataType>
-    void ObjectOutputStream<DataType>::stop() {
+    void ObjectOutputStream<DataType>::stop() const {
 
         if (isValid()) {
             sendStopSignal();
@@ -276,7 +276,7 @@ namespace ch {
 
     // Send string through socket
     template <typename DataType>
-    bool ObjectOutputStream<DataType>::sendString(const std::string & str) const {
+    inline bool ObjectOutputStream<DataType>::sendString(const std::string & str) const {
 
         return ch::sendString(_sockfd, str);
 

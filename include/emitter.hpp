@@ -52,7 +52,7 @@ namespace ch {
     LocalEmitter<DataType>::LocalEmitter(std::ofstream * os): _os{os} {}
 
     template <typename DataType>
-    bool LocalEmitter<DataType>::emit(DataType & v) const {
+    inline bool LocalEmitter<DataType>::emit(DataType & v) const {
         return (bool)((*_os) << v);
     }
 

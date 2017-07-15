@@ -27,10 +27,10 @@ namespace ch {
      */
 
     // Send with given length
-    bool Send(int fd, const void * buffer, size_t len);
+    bool Send(const int & fd, const void * buffer, size_t len);
 
     // Receive with given length
-    bool Recv(int fd, void * buffer, size_t len);
+    bool Recv(const int & fd, void * buffer, size_t len);
 
     // fwrite with given length
     bool Fwrite(FILE * fd, const void * buffer, size_t len);
@@ -70,16 +70,16 @@ namespace ch {
     bool isValidIP_v4(std::string & ip);
 
     // Send file through a socket
-    bool sendFile(const int sockfd, const char * file_path);
+    bool sendFile(const int & sockfd, const char * file_path);
 
     // Receive file from socket
-    bool receiveFile(const int sockfd, const char * file_path);
+    bool receiveFile(const int & sockfd, const char * file_path);
 
     // Send string through socket
-    bool sendString(const int sockfd, const std::string & str);
+    bool sendString(const int & sockfd, const std::string & str);
 
     // Receive string from socket
-    bool receiveString(const int sockfd, std::string & str);
+    bool receiveString(const int & sockfd, std::string & str);
 
     /*
      * File system functions
@@ -115,19 +115,19 @@ namespace ch {
      */
 
     // Invoke master
-    bool invokeMaster(const int fd);
+    bool invokeMaster(const int & sockfd);
 
     // Invoke worker
-    bool invokeWorker(int fd);
+    bool invokeWorker(const int & sockfd);
 
     // Cancel worker
-    bool cancelWorker(int fd);
+    bool cancelWorker(const int & sockfd);
 
     // Return success to chrun program
-    void sendSuccess(const int sockfd);
+    void sendSuccess(const int & sockfd);
 
     // Return fail to chrun program
-    void sendFail(const int sockfd);
+    void sendFail(const int & sockfd);
 
     /*
      * Others

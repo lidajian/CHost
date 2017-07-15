@@ -89,7 +89,7 @@ bool asWorker(const int sockfd) {
         if (source.receiveFiles(confFilePath, jobFilePath, jobName, workingDir)) {
             ipconfig_t ips;
 
-            if (ch::readIPs(confFilePath, ips)) {
+            if (ch::readIPs(confFilePath, ips) && (ips.size() != 0)) {
                 // do job
                 const std::string outputFilePath;
 #ifdef MULTITHREAD_SUPPORT
@@ -107,7 +107,9 @@ bool asWorker(const int sockfd) {
     } else {
         E("Cannot connect to master.");
     }
+
     return false;
+
 }
 
 // Run as master
@@ -242,7 +244,7 @@ int main(int argc, char ** argv) {
         P("Accepting request.");
 
         while (1) {
-            int sockfd = accept(serverfd, reinterpret_cast<struct sockaddr *>(&remote), &s_size);
+            const int sockfd = accept(serverfd, reinterpret_cast<struct sockaddr *>(&remote), &s_size);
             std::thread serve_thread{serve, sockfd};
             serve_thread.detach();
         }

@@ -19,25 +19,16 @@ namespace ch {
      ************** Declaration *****************
     ********************************************/
 
-    /*
-     * pairComparator: comparator template for pair
-     */
-    template <typename DataType_1, typename DataType_2, bool greater>
-    struct pairComparator {
-        bool operator()(const std::pair<DataType_1, DataType_2> & l,
-                        const std::pair<DataType_1, DataType_2> & r) {
-
-            if constexpr (greater) {
-                return l.first > r.first;
-            } else {
-                return l.first < r.first;
-            }
-
-        }
-    };
-
     template <typename DataType>
     class SortedStream {
+
+        private:
+            struct PairGreaterComparator {
+                bool operator()(const std::pair<DataType, std::shared_ptr<std::ifstream> > & l,
+                                const std::pair<DataType, std::shared_ptr<std::ifstream> > & r) {
+                    return l.first > r.first;
+                }
+            };
 
         protected:
 
@@ -47,7 +38,7 @@ namespace ch {
             // Min heap for streams
             std::priority_queue<std::pair<DataType, std::shared_ptr<std::ifstream> >,
                 std::vector<std::pair<DataType, std::shared_ptr<std::ifstream> > >,
-                pairComparator<DataType, std::shared_ptr<std::ifstream>, true> > minHeap;
+                PairGreaterComparator> minHeap;
 
         public:
 

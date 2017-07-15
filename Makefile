@@ -6,7 +6,7 @@ TEMP_PREFIX = ./tmp
 SRC_DIR = ./src
 
 CXX = g++
-CFLAGS += -D _SUGGEST -D _ERROR -Wall -fPIC -std=c++1z -I$(INC_DIR)
+CFLAGS += -D _SUGGEST -D _ERROR -Wall -fPIC -std=c++14 -I$(INC_DIR)
 # CFLAGS += -D _DEBUG
 CFLAGS += -D MULTITHREAD_SUPPORT
 LDFLAGS += -lpthread -ldl

@@ -44,7 +44,7 @@ namespace ch {
             void clear();
 
             // Dereference pointer and compare
-            static bool pointerComp (const DataType * l, const DataType * r);
+            static bool dereferenceComparator (const DataType * & l, const DataType * & r);
 
         public:
 
@@ -105,7 +105,7 @@ namespace ch {
 
     // Dereference pointer and compare
     template <typename DataType>
-    bool DataManager<DataType>::pointerComp (const DataType * l, const DataType * r) {
+    bool DataManager<DataType>::dereferenceComparator (const DataType * & l, const DataType * & r) {
 
         return (*l) < (*r);
 
@@ -133,7 +133,7 @@ namespace ch {
         _data.push_back(v);
 
         if (_data.size() == _maxDataSize) {
-            if (_presort) sort(std::begin(_data), std::end(_data), pointerComp);
+            if (_presort) sort(std::begin(_data), std::end(_data), dereferenceComparator);
             return fileManager.dumpToFile(_data);
         }
 
@@ -145,14 +145,14 @@ namespace ch {
     template <typename DataType>
     bool DataManager<DataType>::store(const DataType & v) {
 
-        DataType * nv = new DataType{v};
+        const DataType * const nv = new DataType{v};
 
         std::lock_guard<std::mutex> holder{_dataLock};
 
         _data.push_back(nv);
 
         if (_data.size() == _maxDataSize) {
-            if (_presort) sort(std::begin(_data), std::end(_data), pointerComp);
+            if (_presort) sort(std::begin(_data), std::end(_data), dereferenceComparator);
             return fileManager.dumpToFile(_data);
         }
 
@@ -167,7 +167,7 @@ namespace ch {
         std::lock_guard<std::mutex> holder{_dataLock};
 
         if (_data.size() != 0) {
-            sort(std::begin(_data), std::end(_data), pointerComp);
+            sort(std::begin(_data), std::end(_data), dereferenceComparator);
             if (!fileManager.dumpToFile(_data)) {
                 E("(DataManager) Fail to dump the remaining data to file.");
                 return nullptr;
@@ -196,7 +196,7 @@ namespace ch {
     }
 
     template <typename DataType>
-    void DataManager<DataType>::setPresort(bool presort) {
+    inline void DataManager<DataType>::setPresort(bool presort) {
 
         _presort = presort;
 
@@ -208,7 +208,7 @@ namespace ch {
         std::lock_guard<std::mutex> holder{_dataLock};
 
         if (_data.size() != 0) {
-            sort(std::begin(_data), std::end(_data), pointerComp);
+            sort(std::begin(_data), std::end(_data), dereferenceComparator);
             if (!fileManager.dumpToFile(_data)) {
                 E("(DataManager) Fail to dump the remaining data to file.");
                 return nullptr;

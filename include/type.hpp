@@ -25,7 +25,7 @@ namespace ch {
             virtual ~TypeBase() {}
 
             // Get id of the object
-            inline static id_t getId() {
+            constexpr static id_t getId() {
                 return ID_INVALID;
             }
 
@@ -95,7 +95,7 @@ namespace ch {
             std::string toString() const {
                 return std::to_string(value);
             }
-            inline static id_t getId() {
+            constexpr static id_t getId() {
                 return ID_INTEGER;
             }
             bool send(int fd) const {
@@ -189,7 +189,7 @@ namespace ch {
             std::string toString() const {
                 return "\"" + value + "\"";
             }
-            inline static id_t getId() {
+            constexpr static id_t getId() {
                 return ID_STRING;
             }
             bool send(int fd) const {
@@ -295,7 +295,7 @@ namespace ch {
             std::string toString() const {
                 return "(" + first.toString() + ", " + second.toString() + ")";
             }
-            inline static id_t getId() {
+            constexpr static id_t getId() {
                 return (DataType_1::getId() << 3) ^ DataType_2::getId();
             }
             bool send(int fd) const {

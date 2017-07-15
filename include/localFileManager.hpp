@@ -12,6 +12,7 @@
 #include <fstream>            // ofstream
 #include <memory>             // unique_ptr
 #include <mutex>              // lock_guard, mutex
+#include <future>             // future
 
 #include "def.hpp"            // RANDOM_FILE_NAME_LENGTH, MERGE_SORT_WAY
 #include "sortedStream.hpp"   // SortedStream
@@ -137,44 +138,36 @@ namespace ch {
         FileIter next_it;
 
         ThreadPool threadPool{THREAD_POOL_SIZE};
-        int isSuccess[MERGE_SORT_WAY]{0}; // 0 if fail, 1 if success
-        size_t numThreads = 0;
+        std::vector<std::future<bool> > isSuccess;
 
         // Step 1: MERGE_SORT_WAY full merge
         for (int i = 0; i < fullSlots; i++) {
             next_it = it + MERGE_SORT_WAY;
-            int & suc = isSuccess[numThreads++];
-            threadPool.addTask([this, it, next_it, &suc](){
-                if (this->unitMergeSort(it, next_it)) {
-                    suc = 1;
-                }
-            });
+            isSuccess.emplace_back(threadPool.addTask([this, it, next_it](){
+                return this->unitMergeSort(it, next_it);
+            }));
             it = next_it;
         }
 
         // Step 2: less than MERGE_SORT_WAY merge
         if (remain > 0) {
             next_it = it + remain;
-            int & suc = isSuccess[numThreads++];
-            threadPool.addTask([this, it, next_it, &suc](){
-                if (this->unitMergeSort(it, next_it)) {
-                    suc = 1;
-                }
-            });
+            isSuccess.emplace_back(threadPool.addTask([this, it, next_it](){
+                return this->unitMergeSort(it, next_it);
+            }));
             it = next_it;
         }
 
-        threadPool.stop();
-
         // Step 3: single files without a need to merge
         while (it < end) {
+            std::lock_guard<std::mutex> holder{lock};
             dumpFiles.push_back(*it);
             ++it;
         }
 
         // Check if success
-        for (size_t i = 0; i < numThreads; ++i) {
-            if (isSuccess[i] == 0) {
+        for (std::future<bool> & suc: isSuccess) {
+            if (!suc.get()) {
                 return false;
             }
         }
@@ -192,33 +185,24 @@ namespace ch {
         FileIter next_it = begin + MERGE_SORT_WAY;
 
         ThreadPool threadPool{THREAD_POOL_SIZE};
-        int isSuccess[MERGE_SORT_WAY]{0}; // 0 if fail, 1 if success
-        size_t numThreads = 0;
+        std::vector<std::future<bool> > isSuccess;
 
         while (next_it < end) {
-            int & suc = isSuccess[numThreads++];
-            threadPool.addTask([this, it, next_it, &suc](){
-                if (this->unitMergeSort(it, next_it)) {
-                    suc = 1;
-                }
-            });
+            isSuccess.emplace_back(threadPool.addTask([this, it, next_it](){
+                return this->unitMergeSort(it, next_it);
+            }));
 
             it = next_it;
             next_it = it + MERGE_SORT_WAY;
         }
 
-        int & suc = isSuccess[numThreads++];
-        threadPool.addTask([this, it, end, &suc](){
-            if (this->unitMergeSort(it, end)) {
-                suc = 1;
-            }
-        });
-
-        threadPool.stop();
+        isSuccess.emplace_back(threadPool.addTask([this, it, end](){
+            return this->unitMergeSort(it, end);
+        }));
 
         // Check if success
-        for (size_t i = 0; i < numThreads; ++i) {
-            if (isSuccess[i] == 0) {
+        for (std::future<bool> & suc: isSuccess) {
+            if (!suc.get()) {
                 return false;
             }
         }

@@ -166,7 +166,7 @@ namespace ch {
                 std::vector<std::unique_ptr<SortedStream<MapperReducerOutputType> > > &&
                                                     sortedStreams = fileManager.getSortedStreams();
 
-                size_t nStreams = sortedStreams.size();
+                const size_t nStreams = sortedStreams.size();
 
                 if (nStreams == 0) {
                     break;
