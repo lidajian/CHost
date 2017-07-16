@@ -6,7 +6,7 @@ BUILD_PREFIX = ../tbin
 CXX = g++
 CFLAGS += -D _DEBUG -D _SUGGEST -D _ERROR -Wall -fPIC -std=c++1z -I$(INC_DIR)
 LDFLAGS += -lpthread
-OBJS = sourceManager utils splitter threadPool
+OBJS = clusterManager utils splitter threadPool
 OBJS_PATHS = $(foreach OBJ, $(OBJS), $(TEMP_PREFIX)/$(OBJ).o)
 TESTS = streamManager type threadPool
 EXECS = $(foreach TEST, $(TESTS), test_$(TEST))

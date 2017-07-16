@@ -10,7 +10,7 @@
 #include <mutex>     // mutex, lock_guard
 #include <string.h>  // memmove
 
-#include "def.hpp"   // DATA_BLOCK_SIZE, IS_ESCAPER
+#include "def.hpp"   // SPLIT_SIZE, isEscaper
 #include "utils.hpp" // Fread
 
 namespace ch {
@@ -23,13 +23,16 @@ namespace ch {
             FILE * _fd;
 
             // The buffer (ends with '\0')
-            char buffer[DATA_BLOCK_SIZE + 1];
+            char buffer[SPLIT_SIZE + 1];
 
             // The data lock that disallow file read by multiple threads
             std::mutex readLock;
 
             // Number of bytes cached in buffer
             size_t bufferedLength;
+
+            // True if is escaper
+            bool isEscaper(const char & c);
 
         public:
 

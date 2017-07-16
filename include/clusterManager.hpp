@@ -23,7 +23,7 @@
 
 namespace ch {
 
-    class SourceManager {
+    class ClusterManager {
 
         public:
 
@@ -35,9 +35,9 @@ namespace ch {
     };
 
     /*
-     * SourceManagerMaster: source manager for master
+     * ClusterManagerMaster: source manager for master
      */
-    class SourceManagerMaster: public SourceManager {
+    class ClusterManagerMaster: public ClusterManager {
 
         protected:
 
@@ -65,22 +65,22 @@ namespace ch {
         public:
 
             // Constructor
-            SourceManagerMaster(const std::string & dataFile, const std::string & jobFilePath);
+            ClusterManagerMaster(const std::string & dataFile, const std::string & jobFilePath);
 
             // Copy constructor (deleted)
-            SourceManagerMaster(const SourceManagerMaster &) = delete;
+            ClusterManagerMaster(const ClusterManagerMaster &) = delete;
 
             // Move constructor (deleted)
-            SourceManagerMaster(SourceManagerMaster &&) = delete;
+            ClusterManagerMaster(ClusterManagerMaster &&) = delete;
 
             // Copy assignment (deleted)
-            SourceManagerMaster & operator = (const SourceManagerMaster &) = delete;
+            ClusterManagerMaster & operator = (const ClusterManagerMaster &) = delete;
 
             // Move assignment (deleted)
-            SourceManagerMaster & operator = (SourceManagerMaster &&) = delete;
+            ClusterManagerMaster & operator = (ClusterManagerMaster &&) = delete;
 
             // Destructor
-            ~SourceManagerMaster();
+            ~ClusterManagerMaster();
 
             // Connect to workers and deliver files
             bool connectAndDeliver(const ipconfig_t & ips, const std::string & jobName, const unsigned short port = SERVER_PORT);
@@ -100,9 +100,9 @@ namespace ch {
     };
 
     /*
-     * SourceManagerWorker: source manager for workers
+     * ClusterManagerWorker: source manager for workers
      */
-    class SourceManagerWorker: public SourceManager {
+    class ClusterManagerWorker: public ClusterManager {
 
         protected:
 
@@ -120,19 +120,19 @@ namespace ch {
         public:
 
             // Constructor for worker
-            SourceManagerWorker(const int & sockfd);
+            ClusterManagerWorker(const int & sockfd);
 
             // Copy Constructor
-            SourceManagerWorker(const SourceManagerWorker & o);
+            ClusterManagerWorker(const ClusterManagerWorker & o);
 
             // Move Constructor
-            SourceManagerWorker(SourceManagerWorker && o);
+            ClusterManagerWorker(ClusterManagerWorker && o);
 
             // Copy assignment
-            SourceManagerWorker & operator = (const SourceManagerWorker & o);
+            ClusterManagerWorker & operator = (const ClusterManagerWorker & o);
 
             // Move assignment
-            SourceManagerWorker & operator = (SourceManagerWorker && o);
+            ClusterManagerWorker & operator = (ClusterManagerWorker && o);
 
             // Receive resource files
             // 1. Configuration file

@@ -1,10 +1,16 @@
 #include "splitter.hpp"
 
 namespace ch {
+
+    // True if is escaper
+    inline bool Splitter::isEscaper(const char & c) {
+        return (c == '\r') || (c == '\n');
+    }
+
     // Default constructor
     Splitter::Splitter(): _fd{nullptr}, bufferedLength{0} {
 
-        buffer[DATA_BLOCK_SIZE] = '\0';
+        buffer[SPLIT_SIZE] = '\0';
 
     }
 
@@ -53,7 +59,7 @@ namespace ch {
             return false;
         }
 
-        size_t rv = fread(buffer + bufferedLength, sizeof(char), DATA_BLOCK_SIZE - bufferedLength, _fd);
+        size_t rv = fread(buffer + bufferedLength, sizeof(char), SPLIT_SIZE - bufferedLength, _fd);
 
         if (rv == 0) { // EOF
             if (bufferedLength == 0) {
@@ -69,11 +75,11 @@ namespace ch {
             const size_t totalLength = rv + bufferedLength;
             size_t cursor;
             char c;
-            int returnLength;
+            size_t returnLength;
 
             for (cursor = totalLength - 1; cursor > 0; --cursor) {
                 c = buffer[cursor];
-                if (IS_ESCAPER(c)) {
+                if (isEscaper(c)) {
                     returnLength = cursor + 1;
                     res.append(buffer, returnLength);
                     bufferedLength = totalLength - returnLength;
@@ -85,7 +91,7 @@ namespace ch {
 
             if (cursor == 0) {
                 c = buffer[cursor];
-                if (IS_ESCAPER(c)) {
+                if (isEscaper(c)) {
                     returnLength = cursor + 1;
                     res.append(buffer, returnLength);
                     bufferedLength = totalLength - returnLength;

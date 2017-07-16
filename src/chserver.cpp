@@ -8,8 +8,8 @@
 #include <string>            // string
 #include <thread>            // thread
 
-#include "def.hpp"           // SERVER_PORT, CALL_xxx
-#include "sourceManager.hpp" // SourceManagerWorker, SourceManagerMaster
+#include "def.hpp"           // SERVER_PORT
+#include "clusterManager.hpp" // ClusterManagerWorker, ClusterManagerMaster
 #include "job.hpp"           // job_f, context_t
 #include "utils.hpp"         // readIPs, receiveString, getWorkingDirectory,
                              // sendFail, sendSuccess, prepareServer
@@ -78,7 +78,7 @@ bool asWorker(const int sockfd) {
 
     P("Running as worker.");
 
-    ch::SourceManagerWorker source{sockfd};
+    ch::ClusterManagerWorker source{sockfd};
 
     if (source.isValid()) {
         std::string jobFilePath;
@@ -159,7 +159,7 @@ bool asMaster(int sockfd) {
         return false;
     }
 
-    ch::SourceManagerMaster source{dataFilePath, jobFilePath};
+    ch::ClusterManagerMaster source{dataFilePath, jobFilePath};
 
     if (source.isValid()) {
 
@@ -207,20 +207,20 @@ void serve(const int sockfd) {
 
         if (ch::Recv(sockfd, static_cast<void *>(&c), sizeof(char))) {
             P("Job accepted.");
-            if (c == CALL_MASTER) {
+            if (c == ch::CALL_MASTER) {
                 if (!asMaster(sockfd)) {
                     ch::sendFail(sockfd);
                 } else {
                     ch::sendSuccess(sockfd);
                 }
-            } else if (c == CALL_WORKER) {
-                // Result to be processed by sourceManager
+            } else if (c == ch::CALL_WORKER) {
+                // Result to be processed by clusterManager
                 if (!asWorker(sockfd)) {
                     ch::sendFail(sockfd);
                 } else {
                     ch::sendSuccess(sockfd);
                 }
-            } else if (c == CALL_CANCEL) {
+            } else if (c == ch::CALL_CANCEL) {
                 P("Job canceled by master.");
             } else {
                 P("Unsupported call.");

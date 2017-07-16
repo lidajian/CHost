@@ -7,7 +7,7 @@ CFLAGS += -D _SUGGEST -D _ERROR -Wall -std=c++14 -fPIC -I$(INC_DIR)
 # CFLAGS += -D _DEBUG
 CFLAGS += -D MULTITHREAD_SUPPORT
 LDFLAGS += -shared
-OBJS = sourceManager utils splitter threadPool
+OBJS = clusterManager utils splitter threadPool
 OBJS_PATHS = $(foreach OBJ, $(OBJS), $(TEMP_PREFIX)/$(OBJ).o)
 EXECS = wordcount
 EXECS_PATHS = $(foreach EXEC, $(EXECS), $(BUILD_PREFIX)/$(EXEC))

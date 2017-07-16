@@ -131,9 +131,9 @@ namespace ch {
     bool LocalFileManager<DataType>::gridMergeSort (const FileIter & begin,
                                                     const FileIter & end) {
 
-        const int l = end - begin - MERGE_SORT_WAY; // reserve for all slot
-        const int fullSlots = l / (MERGE_SORT_WAY - 1); // number of full merges
-        const int remain = l % (MERGE_SORT_WAY - 1) + 1; // number of files to merge
+        const size_t l = end - begin - MERGE_SORT_WAY; // reserve for all slot
+        const size_t fullSlots = l / (MERGE_SORT_WAY - 1); // number of full merges
+        const size_t remain = l % (MERGE_SORT_WAY - 1) + 1; // number of files to merge
         FileIter it = begin;
         FileIter next_it;
 
@@ -141,7 +141,7 @@ namespace ch {
         std::vector<std::future<bool> > isSuccess;
 
         // Step 1: MERGE_SORT_WAY full merge
-        for (int i = 0; i < fullSlots; i++) {
+        for (size_t i = 0; i < fullSlots; i++) {
             next_it = it + MERGE_SORT_WAY;
             isSuccess.emplace_back(threadPool.addTask([this, it, next_it](){
                 return this->unitMergeSort(it, next_it);
@@ -298,7 +298,7 @@ namespace ch {
     bool LocalFileManager<DataType>::getStream(std::ofstream & os) {
 
         std::string fullPath{dumpFileDir};
-        fullPath.append("/.", LENGTH_CONST_CHAR_ARRAY("/."));
+        fullPath.append("/.");
         fullPath += randomString(RANDOM_FILE_NAME_LENGTH);
 
         os.open(fullPath);

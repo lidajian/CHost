@@ -18,11 +18,15 @@ namespace ch {
 
     typedef unsigned char id_t;
 
-    class TypeBase {
+    constexpr id_t ID_INVALID = 0;
+    constexpr id_t ID_INTEGER = 1;
+    constexpr id_t ID_STRING  = 2;
+
+    class Object {
 
         public:
 
-            virtual ~TypeBase() {}
+            virtual ~Object() {}
 
             // Get id of the object
             constexpr static id_t getId() {
@@ -51,26 +55,26 @@ namespace ch {
             virtual std::ofstream & write(std::ofstream & os) const = 0;
 
             // Output to file
-            friend std::ofstream & operator << (std::ofstream & os, const TypeBase & v);
+            friend std::ofstream & operator << (std::ofstream & os, const Object & v);
 
             // Input from file
-            friend std::ifstream & operator >> (std::ifstream & is, const TypeBase & v);
+            friend std::ifstream & operator >> (std::ifstream & is, const Object & v);
 
             // Output to ostream
-            friend std::ostream & operator << (std::ostream & os, const TypeBase & v);
+            friend std::ostream & operator << (std::ostream & os, const Object & v);
     };
 
-    std::ofstream & operator << (std::ofstream & os, const TypeBase & v) {
+    std::ofstream & operator << (std::ofstream & os, const Object & v) {
         return v.write(os);
     }
-    std::ifstream & operator >> (std::ifstream & is, TypeBase & v) {
+    std::ifstream & operator >> (std::ifstream & is, Object & v) {
         return v.read(is);
     }
-    std::ostream & operator << (std::ostream & os, const TypeBase & v) {
+    std::ostream & operator << (std::ostream & os, const Object & v) {
         return os << v.toString();
     }
 
-    class Integer: public TypeBase {
+    class Integer: public Object {
 
         public:
 
@@ -142,7 +146,7 @@ namespace ch {
             }
     };
 
-    class String: public TypeBase {
+    class String: public Object {
 
         protected:
 
@@ -255,7 +259,7 @@ namespace ch {
     };
 
     template <typename DataType_1, typename DataType_2>
-    class Tuple: public TypeBase {
+    class Tuple: public Object {
 
         public:
 

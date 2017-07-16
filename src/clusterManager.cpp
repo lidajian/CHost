@@ -1,9 +1,9 @@
-#include "sourceManager.hpp"
+#include "clusterManager.hpp"
 
 namespace ch {
 
     // Rearrange ipconfig to create configure files for other machines
-    void SourceManagerMaster::rearrangeIPs(const ipconfig_t & ips, std::string & file,
+    void ClusterManagerMaster::rearrangeIPs(const ipconfig_t & ips, std::string & file,
                                            const size_t & indexToHead) {
 
         file = std::to_string(ips[indexToHead].first) + " " + ips[indexToHead].second + "\n";
@@ -17,22 +17,22 @@ namespace ch {
     }
 
     // Constructor
-    SourceManagerMaster::SourceManagerMaster(const std::string & dataFile,
+    ClusterManagerMaster::ClusterManagerMaster(const std::string & dataFile,
                                              const std::string & jobFilePath)
     : _jobFilePath{jobFilePath} {
 
         if (readFileAsString(jobFilePath.c_str(), _jobFileContent)) {
             if (!splitter.open(dataFile.c_str())) {
-                E("(SourceManagerMaster) Fail to open data file.");
+                E("(ClusterManagerMaster) Fail to open data file.");
             }
         } else {
-            E("(SourceManagerMaster) Fail to read job file.");
+            E("(ClusterManagerMaster) Fail to read job file.");
         }
 
     }
 
     // Destructor
-    SourceManagerMaster::~SourceManagerMaster() {
+    ClusterManagerMaster::~ClusterManagerMaster() {
 
         for (size_t i = 1, l = connections.size(); i < l; ++i) {
             if (connections[i] >= 0) {
@@ -43,7 +43,7 @@ namespace ch {
     }
 
     // Connect to workers and deliver files
-    bool SourceManagerMaster::connectAndDeliver(const ipconfig_t & ips,
+    bool ClusterManagerMaster::connectAndDeliver(const ipconfig_t & ips,
                                                 const std::string & jobName,
                                                 const unsigned short port) {
 
@@ -66,7 +66,7 @@ namespace ch {
 
                 // create socket to clients
                 if (!sconnect(sockfd, ip.c_str(), port)) {
-                    ESS("(SourceManagerMaster) Cannot connect to client on" << ip);
+                    ESS("(ClusterManagerMaster) Cannot connect to client on" << ip);
                     sockfd = INVALID_SOCKET;
                     break;
                 }
@@ -85,7 +85,7 @@ namespace ch {
                 }
             }
 
-            ThreadPool threadPool{MIN_VAL(THREAD_POOL_SIZE, nConnections)};
+            ThreadPool threadPool{MIN(THREAD_POOL_SIZE, nConnections)};
 
             for (size_t i = 1; i < l; ++i) {
                 int & sockfd = connections[i];
@@ -149,7 +149,7 @@ namespace ch {
     }
 
     // Start distribution thread
-    void SourceManagerMaster::startDistributionThread() {
+    void ClusterManagerMaster::startDistributionThread() {
 
         const size_t l = connections.size();
         workerIsSuccess.resize(l, false);
@@ -174,7 +174,7 @@ namespace ch {
                             break;
                         }
                         if (!sendString(sockfd, split)) {
-                            E("(SourceManagerMaster) Failed to send split.");
+                            E("(ClusterManagerMaster) Failed to send split.");
                             break;
                         }
                         split.clear();
@@ -182,7 +182,7 @@ namespace ch {
                 }
 
                 if (!Recv(sockfd, static_cast<void *>(&receivedChar), sizeof(char))) {
-                    E("(SourceManagerMaster) No response from worker.");
+                    E("(ClusterManagerMaster) No response from worker.");
                     close(sockfd);
                     return;
                 }
@@ -210,7 +210,7 @@ namespace ch {
                                     break;
                                 }
                                 if (!sendString(sockfd, split)) {
-                                    E("(SourceManagerMaster) Failed to send split.");
+                                    E("(ClusterManagerMaster) Failed to send split.");
                                     break;
                                 }
                                 split.clear();
@@ -218,7 +218,7 @@ namespace ch {
                         }
 
                         if (!Recv(sockfd, static_cast<void *>(&receivedChar), sizeof(char))) {
-                            E("(SourceManagerMaster) No response from worker.");
+                            E("(ClusterManagerMaster) No response from worker.");
                             close(sockfd);
                             return;
                         }
@@ -345,7 +345,7 @@ namespace ch {
                                 char receivedChar;
 
                                 if (!Recv(sockfd, static_cast<void *>(&receivedChar), sizeof(char))) {
-                                    E("(SourceManagerMaster) No response from worker.");
+                                    E("(ClusterManagerMaster) No response from worker.");
                                     ++endedConnection;
                                     close(sockfd);
                                 } else {
@@ -375,7 +375,7 @@ namespace ch {
                                                 repliedEOF[sockfd] = true;
                                                 Send(sockfd, static_cast<void *>(&endSize), sizeof(ssize_t));
                                             } else if (!sendString(sockfd, split)) {
-                                                E("(SourceManagerMaster) Failed to send split.");
+                                                E("(ClusterManagerMaster) Failed to send split.");
                                                 ++endedConnection;
                                                 close(sockfd);
                                             }
@@ -405,7 +405,7 @@ namespace ch {
     }
 
     // Block the current thread until all distribution threads terminate
-    void SourceManagerMaster::blockTillDistributionThreadsEnd() {
+    void ClusterManagerMaster::blockTillDistributionThreadsEnd() {
 
         if (dthread != nullptr) {
             dthread->join();
@@ -416,18 +416,18 @@ namespace ch {
     }
 
     // True if all worker success
-    bool SourceManagerMaster::allWorkerSuccess() {
+    bool ClusterManagerMaster::allWorkerSuccess() {
 
         const size_t numIPs = workerIsSuccess.size();
 
         if (numIPs == 0) {
-            D("(SourceManagerMaster) Cannot get worker results when no threads started.");
+            D("(ClusterManagerMaster) Cannot get worker results when no threads started.");
             return false;
         }
 
         for (size_t i = 1; i < numIPs; ++i) {
             if (!workerIsSuccess[i]) {
-                DSS("(SourceManagerMaster) The " << i << "th worker failed.");
+                DSS("(ClusterManagerMaster) The " << i << "th worker failed.");
                 return false;
             }
         }
@@ -436,20 +436,20 @@ namespace ch {
 
     }
 
-    inline bool SourceManagerMaster::isValid() const {
+    inline bool ClusterManagerMaster::isValid() const {
 
         return splitter.isValid();
 
     }
 
-    inline bool SourceManagerMaster::poll(std::string & ret) {
+    inline bool ClusterManagerMaster::poll(std::string & ret) {
 
         return splitter.next(ret);
 
     }
 
     // Send poll request
-    inline bool SourceManagerWorker::pollRequest() const {
+    inline bool ClusterManagerWorker::pollRequest() const {
 
         const char c = CALL_POLL;
         return Send(fd, static_cast<const void *>(&c), sizeof(char));
@@ -457,20 +457,20 @@ namespace ch {
     }
 
     // Constructor for worker
-    SourceManagerWorker::SourceManagerWorker(const int & sockfd): fd{sockfd} {}
+    ClusterManagerWorker::ClusterManagerWorker(const int & sockfd): fd{sockfd} {}
 
     // Copy Constructor
-    SourceManagerWorker::SourceManagerWorker(const SourceManagerWorker & o): fd{o.fd} {}
+    ClusterManagerWorker::ClusterManagerWorker(const ClusterManagerWorker & o): fd{o.fd} {}
 
     // Move Constructor
-    SourceManagerWorker::SourceManagerWorker(SourceManagerWorker && o): fd{o.fd} {
+    ClusterManagerWorker::ClusterManagerWorker(ClusterManagerWorker && o): fd{o.fd} {
 
         o.fd = INVALID_SOCKET;
 
     }
 
     // Copy assignment
-    SourceManagerWorker & SourceManagerWorker::operator = (const SourceManagerWorker & o) {
+    ClusterManagerWorker & ClusterManagerWorker::operator = (const ClusterManagerWorker & o) {
 
         fd = o.fd;
 
@@ -479,7 +479,7 @@ namespace ch {
     }
 
     // Move assignment
-    SourceManagerWorker & SourceManagerWorker::operator = (SourceManagerWorker && o) {
+    ClusterManagerWorker & ClusterManagerWorker::operator = (ClusterManagerWorker && o) {
 
         fd = o.fd;
         o.fd = INVALID_SOCKET;
@@ -490,13 +490,13 @@ namespace ch {
     // Receive resource files
     // 1. Configuration file
     // 2. Job file
-    bool SourceManagerWorker::receiveFiles(std::string & confFilePath,
+    bool ClusterManagerWorker::receiveFiles(std::string & confFilePath,
                                            std::string & jobFilePath,
                                            std::string & jobName,
                                            std::string & workingDir) {
 
         if (!isValid()) {
-            D("(SourceManagerWorker) The socket failed.");
+            D("(ClusterManagerWorker) The socket failed.");
             return false;
         }
 
@@ -526,29 +526,29 @@ namespace ch {
 
     }
 
-    inline bool SourceManagerWorker::isValid() const {
+    inline bool ClusterManagerWorker::isValid() const {
 
         return (fd > 0);
 
     }
 
-    bool SourceManagerWorker::poll(std::string & ret) {
+    bool ClusterManagerWorker::poll(std::string & ret) {
 
 #ifdef MULTITHREAD_SUPPORT
         std::lock_guard<std::mutex> holder{lock};
 #endif
 
         if (!isValid()) {
-            D("(SourceManagerWorker) The socket failed.");
+            D("(ClusterManagerWorker) The socket failed.");
             return false;
         } else {
             // request a block
             if (!pollRequest()) {
-                D("(SourceManagerWorker) Fail to send poll request. Broken pipe.");
+                D("(ClusterManagerWorker) Fail to send poll request. Broken pipe.");
                 fd = INVALID_SOCKET;
                 return false;
             } else if (!receiveString(fd, ret)) {
-                D("(SourceManagerWorker) Fail to receive the string or remote file EOF.");
+                D("(ClusterManagerWorker) Fail to receive the string or remote file EOF.");
                 fd = INVALID_SOCKET;
                 return false;
             } else {

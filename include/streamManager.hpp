@@ -18,6 +18,7 @@
 #include <chrono>           // seconds
 #include <memory>           // unique_ptr, std::addressof
 #include <unordered_map>    // unordered_map
+#include <algorithm>        // max
 
 #include "def.hpp"          // ipconfig_t, STREAMMANAGER_PORT, MAX_CONNECTION_ATTEMPT,
                             // select/epoll/kqueue headers
@@ -314,7 +315,7 @@ namespace ch {
             std::unique_ptr<ObjectOutputStream<DataType> > & stmr, const std::string & jobName) {
 
         std::unique_ptr<ObjectOutputStream<DataType> > stm{new ObjectOutputStream<DataType>{}};
-        int tries = 0;
+        uint tries = 0;
 
         while (tries < MAX_CONNECTION_ATTEMPT && !(stm->open(ip, STREAMMANAGER_PORT))) {
             ++tries;
@@ -364,7 +365,7 @@ namespace ch {
         istreams.reserve(clusterSize - 1);
         connections.reserve(clusterSize - 1);
         ostreams.resize(clusterSize);
-        ThreadPool threadPool{MIN_VAL(THREAD_POOL_SIZE, clusterSize - 1)};
+        ThreadPool threadPool{MIN(THREAD_POOL_SIZE, clusterSize - 1)};
 
         // create server thread to accept connection
         std::thread sthread{serverThread, serverfd, std::ref(ips), std::ref(istreams),
@@ -599,7 +600,7 @@ namespace ch {
 
                     for (size_t i = 0; i < nWorker; ++i) {
                         const int & conn = this->connections[i];
-                        fdmax = MAX_VAL(fdmax, conn);
+                        fdmax = std::max(fdmax, conn);
                         FD_SET(conn, &fdset_o);
                         fdToIndex[conn] = i;
                     }

@@ -10,7 +10,7 @@ CFLAGS += -D _SUGGEST -D _ERROR -Wall -fPIC -std=c++14 -I$(INC_DIR)
 # CFLAGS += -D _DEBUG
 CFLAGS += -D MULTITHREAD_SUPPORT
 LDFLAGS += -lpthread -ldl
-OBJS = sourceManager utils splitter threadPool
+OBJS = clusterManager utils splitter threadPool
 OBJS_PATHS = $(foreach OBJ, $(OBJS), $(TEMP_PREFIX)/$(OBJ).o)
 EXECS = chserver chrun
 

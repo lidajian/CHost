@@ -22,6 +22,16 @@
 
 namespace ch {
 
+    // RPC symbols
+    constexpr char CALL_MASTER = 'M';
+    constexpr char CALL_WORKER = 'W';
+    constexpr char CALL_CANCEL = 'C';
+    constexpr char CALL_POLL   = 'P';
+
+    // Success/Fail symbols
+    constexpr char RES_SUCCESS = 0;
+    constexpr char RES_FAIL    = 1;
+
     /*
      * Promised I/O wrapper
      */

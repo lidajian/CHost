@@ -12,7 +12,7 @@
 #include <fstream>              // ofstream
 
 #include "def.hpp"              // ipconfig_t
-#include "sourceManager.hpp"    // SourceManager
+#include "clusterManager.hpp"    // ClusterManager
 #include "sortedStream.hpp"     // SortedStream
 #include "streamManager.hpp"    // StreamManager, ClusterEmitter
 #include "localFileManager.hpp" // LocalFileManager
@@ -26,7 +26,7 @@ namespace ch {
      */
     struct context_t {
         const ipconfig_t & _ips;
-        ch::SourceManager & _source;
+        ch::ClusterManager & _source;
         const std::string & _outputFilePath;
         const std::string & _workingDir;
         const std::string & _jobName;
@@ -34,7 +34,7 @@ namespace ch {
         const bool _supportMultithread;
 
         explicit context_t(const ipconfig_t & ips,
-                           ch::SourceManager & source,
+                           ch::ClusterManager & source,
                            const std::string & outputFilePath,
                            const std::string & workingDir,
                            const std::string & jobName,
@@ -104,9 +104,9 @@ namespace ch {
         if (context._supportMultithread) {
             std::vector<std::thread> mappers;
             std::vector<std::string> polleds(NUM_MAPPER);
-            SourceManager & source = context._source;
+            ClusterManager & source = context._source;
 
-            for (size_t i = 0; i < NUM_MAPPER; ++i) {
+            for (uint i = 0; i < NUM_MAPPER; ++i) {
                 std::string & polled = polleds[i];
 
                 mappers.emplace_back([&source, &polled, &emitter](){
@@ -180,7 +180,7 @@ namespace ch {
 
                     break;
                 } else { // Store locally for next iteration
-                    ThreadPool threadPool{MIN_VAL(THREAD_POOL_SIZE, nStreams)};
+                    ThreadPool threadPool{MIN(THREAD_POOL_SIZE, nStreams)};
                     std::vector<std::ofstream> ostms(nStreams);
 
                     for (size_t i = 0; i < nStreams; ++i) {
@@ -266,9 +266,9 @@ namespace ch {
         if (context._supportMultithread) {
             std::vector<std::thread> mappers;
             std::vector<std::string> polleds(NUM_MAPPER);
-            SourceManager & source = context._source;
+            ClusterManager & source = context._source;
 
-            for (size_t i = 0; i < NUM_MAPPER; ++i) {
+            for (uint i = 0; i < NUM_MAPPER; ++i) {
                 std::string & polled = polleds[i];
 
                 mappers.emplace_back([&source, &polled, &emitter_mapper](){

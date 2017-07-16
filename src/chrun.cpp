@@ -94,7 +94,7 @@ void getResult(const int sockfd) {
 
     if (!ch::Recv(sockfd, static_cast<void *>(&c), sizeof(char))) {
         P("No response from the server.");
-    } else if (c == RES_SUCCESS) {
+    } else if (c == ch::RES_SUCCESS) {
         P("Job Succeed.");
     } else {
         P("Job Fail.");

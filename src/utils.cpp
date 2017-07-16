@@ -288,7 +288,7 @@ namespace ch {
 
             do {
                 byteLeft = fileSize - sentSize;
-                toSend = MIN_VAL(byteLeft, BUFFER_SIZE);
+                toSend = MIN(byteLeft, BUFFER_SIZE);
 
                 if (!Fread(fd, buffer, toSend)) {
                     D("(sendFile) Unexepected EOF.");
@@ -338,7 +338,7 @@ namespace ch {
 
             do {
                 byteLeft = fileSize - receivedSize;
-                toReceive = MIN_VAL(byteLeft, BUFFER_SIZE);
+                toReceive = MIN(byteLeft, BUFFER_SIZE);
 
                 if (Recv(sockfd, static_cast<void *>(buffer), toReceive)) {
                     if (!Fwrite(fd, buffer, toReceive)) {
@@ -378,7 +378,7 @@ namespace ch {
 
             do {
                 byteLeft = strSize - sentSize;
-                toSend = MIN_VAL(byteLeft, BUFFER_SIZE);
+                toSend = MIN(byteLeft, BUFFER_SIZE);
                 if (!Send(sockfd, static_cast<const void *>(strStart + sentSize), toSend)) {
                     D("(sendString) Broken pipe.");
                     return false;
@@ -408,7 +408,7 @@ namespace ch {
 
             do {
                 byteLeft = strSize - receivedSize;
-                toReceive = MIN_VAL(byteLeft, BUFFER_SIZE);
+                toReceive = MIN(byteLeft, BUFFER_SIZE);
                 if (Recv(sockfd, static_cast<void *>(buffer), toReceive)) {
                     str.append(buffer, toReceive);
                     receivedSize += toReceive;
@@ -569,7 +569,7 @@ namespace ch {
 
         do {
             byteLeft = fileSize - copiedSize;
-            toCopy = MIN_VAL(byteLeft, BUFFER_SIZE);
+            toCopy = MIN(byteLeft, BUFFER_SIZE);
 
             if (!Fread(srcfd, buffer, toCopy)) {
                 D("(Copy) Unexepected EOF.");
