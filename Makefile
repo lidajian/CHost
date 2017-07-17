@@ -6,10 +6,10 @@ TEMP_PREFIX = ./tmp
 SRC_DIR = ./src
 
 CXX = g++
-CFLAGS += -D _SUGGEST -D _ERROR -Wall -fPIC -std=c++14 -I$(INC_DIR)
+CFLAGS += -D _SUGGEST -D _ERROR -Wall -fPIC -std=c++11 -I$(INC_DIR)
 # CFLAGS += -D _DEBUG
 CFLAGS += -D MULTITHREAD_SUPPORT
-LDFLAGS += -lpthread -ldl
+LDFLAGS += -pthread -ldl
 OBJS = clusterManager utils splitter threadPool
 OBJS_PATHS = $(foreach OBJ, $(OBJS), $(TEMP_PREFIX)/$(OBJ).o)
 EXECS = chserver chrun
@@ -17,10 +17,10 @@ EXECS = chserver chrun
 all: build_dir $(OBJS) $(EXECS)
 
 $(OBJS) : % : $(SRC_DIR)/%.cpp
-	$(CXX) $(CFLAGS) -c $^ -o $(TEMP_PREFIX)/$@.o
+	$(CXX) $(CFLAGS) $(LDFLAGS) -c $^ -o $(TEMP_PREFIX)/$@.o
 
 $(EXECS) : % : $(SRC_DIR)/%.cpp $(OBJS_PATHS) 
-	$(CXX) $(CFLAGS) $(LDFLAGS) -o $(BUILD_PREFIX)/$@ $^
+	$(CXX) $(CFLAGS) -o $(BUILD_PREFIX)/$@ $^ $(LDFLAGS) 
 
 .PHONY: build_dir
 build_dir:

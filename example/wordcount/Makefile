@@ -3,7 +3,7 @@ BUILD_PREFIX = ../../bin
 TEMP_PREFIX = ../../tmp
 
 CXX = g++
-CFLAGS += -D _SUGGEST -D _ERROR -Wall -std=c++14 -fPIC -I$(INC_DIR)
+CFLAGS += -D _SUGGEST -D _ERROR -Wall -std=c++11 -fPIC -I$(INC_DIR)
 # CFLAGS += -D _DEBUG
 CFLAGS += -D MULTITHREAD_SUPPORT
 LDFLAGS += -shared
